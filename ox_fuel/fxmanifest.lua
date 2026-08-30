@@ -22,6 +22,7 @@ shared_scripts {
 }
 
 server_scripts {
+	'server/version.lua',
 	'server.lua'
 }
 

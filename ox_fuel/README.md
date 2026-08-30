@@ -4,6 +4,8 @@ An independent community expansion of [CommunityOx ox_fuel v1.5.2](https://githu
 
 This is not an official CommunityOx release. Keep the installed resource folder named `ox_fuel` for compatibility with existing exports and integrations.
 
+Maintained source and downloads: [DrSnyder86/ox_fuel-Expanded](https://github.com/DrSnyder86/ox_fuel-Expanded)
+
 ## Highlights
 
 - Physical fuel nozzles and EV connectors with hoses, cables, sounds, animations, and vehicle attachment.
@@ -15,6 +17,7 @@ This is not an official CommunityOx release. Keep the installed resource folder 
 - Purchasable, deployable, damageable, and rechargeable portable EV power unit.
 - Synchronized pump occupancy, spawned custom pumps, scripted pump explosions, and electrical charger faults.
 - Optional Chaos Mode with server-side chance rolls and economy-safe interrupted settlement.
+- Configurable startup version check against the maintained GitHub package.
 
 ## Requirements
 
@@ -51,6 +54,7 @@ The main settings are grouped in `config.lua`:
 
 | Section | Purpose |
 | --- | --- |
+| `versionCheck` | GitHub manifest URL, download URL, startup delay, and console notices |
 | `fueling` | Grades, prices, flow speed, and price precision |
 | `payments` | Cash/bank options and defaults |
 | `pumpOccupancy` | Pump leases and heartbeat timing |
@@ -63,6 +67,8 @@ The main settings are grouped in `config.lua`:
 | `chaosMode` | Optional running-engine, drive-off, old-pump, and charging faults |
 
 Fuel remains stored as a `0` to `100` vehicle state value for ox_fuel compatibility. Gallons, kWh, price, premium blend, and portable pack charge are calculated and validated by the server.
+
+The version checker runs once at server startup and prints only when a newer package is available unless `notifyCurrent` or `verboseErrors` is enabled. Set `versionCheck.enabled = false` to disable it. Each public update must also bump `version` in `ox_fuel/fxmanifest.lua` on GitHub.
 
 ### Payment Support
 
@@ -122,6 +128,7 @@ Compared with CommunityOx ox_fuel v1.5.2, this build adds:
 - Portable EV power, item metadata, purchase, deployment, charging, damage, and recharge flows.
 - Persistent electric assets through the `ox_fuel_assets` companion.
 - Optional, disabled-by-default Chaos Mode.
+- Maintained-repository startup version checking.
 
 ## Testing Notes
 
