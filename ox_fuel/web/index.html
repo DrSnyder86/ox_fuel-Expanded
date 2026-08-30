@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel meter</title>
+    <link rel="stylesheet" href="style.css?v=19">
+</head>
+<body>
+    <main id="fuel-meter" class="fuel-meter" aria-hidden="true">
+        <div id="gas-interface" class="meter-body">
+            <div id="pump-logo" class="pump-logo" hidden>
+                <img id="pump-logo-image" alt="">
+            </div>
+
+            <div class="meter-content">
+                <section id="pump-register" class="pump-register" aria-label="Fueling details">
+                    <div class="register-row">
+                        <span id="primary-label" class="register-label">Sale $</span>
+                        <div id="primary-value" class="segment-display" aria-label="$0.00"></div>
+                    </div>
+                    <div class="register-row">
+                        <span id="secondary-label" class="register-label">Gallons</span>
+                        <div id="secondary-value" class="segment-display" aria-label="0.000 gallons"></div>
+                    </div>
+
+                    <div class="register-details">
+                        <div id="meter-status" class="register-detail-cell register-status" role="img" aria-label="Pump ready">
+                            <svg id="status-fuel" class="status-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M3 22h12"></path>
+                                <path d="M4 9h10"></path>
+                                <path d="M4 2h10v20H4z"></path>
+                                <path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0V9.8a2 2 0 0 0-.6-1.4L18 5"></path>
+                            </svg>
+                            <svg id="status-complete" class="status-icon" viewBox="0 0 24 24" aria-hidden="true" hidden>
+                                <path d="m20 6-11 11-5-5"></path>
+                            </svg>
+                            <svg id="status-stopped" class="status-icon" viewBox="0 0 24 24" aria-hidden="true" hidden>
+                                <path d="M18 6 6 18"></path>
+                                <path d="m6 6 12 12"></path>
+                            </svg>
+                        </div>
+                        <div class="register-detail-cell register-level">
+                            <span id="tank-level-label" class="tank-level-label">Tank</span>
+                            <strong id="tank-level-value" class="tank-level-value is-unavailable">--%</strong>
+                        </div>
+                        <div class="register-detail-cell register-transaction">
+                            <span id="meter-phase" class="meter-phase">$0.00/GAL</span>
+                            <span id="meter-choice" class="meter-choice" hidden></span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+		<section id="portable-terminal" class="portable-terminal" aria-label="Portable power details" hidden>
+			<header class="portable-header">
+				<span>PORTABLE POWER</span>
+				<strong id="portable-status">READY</strong>
+			</header>
+
+			<div class="portable-pack">
+				<span class="portable-battery" aria-hidden="true">
+					<span id="portable-pack-fill" class="portable-pack-fill"></span>
+				</span>
+				<div class="portable-pack-copy">
+					<span>PACK</span>
+					<strong id="portable-pack-value">--%</strong>
+				</div>
+			</div>
+
+			<div class="portable-facts">
+				<div><span>EV</span><strong id="portable-vehicle-value">--%</strong></div>
+				<div><span>OUT kWh</span><strong id="portable-energy-value">0.00</strong></div>
+				<div><span>TIME</span><strong id="portable-time-value">--</strong></div>
+			</div>
+		</section>
+
+        <section id="ev-terminal" class="ev-terminal" aria-label="Electric charging details" hidden>
+            <div class="ev-wallpaper" aria-hidden="true">
+                <img id="ev-logo-image" alt="">
+            </div>
+
+            <header class="ev-header">
+                <span id="ev-brand-name">SENTINEL CHARGE</span>
+                <time id="ev-clock">--:--</time>
+            </header>
+
+            <div class="ev-charge-summary">
+                <strong id="ev-battery-value" class="ev-battery-value" aria-label="Battery level unavailable">--%</strong>
+                <div class="ev-battery-track" aria-hidden="true">
+                    <span id="ev-battery-fill" class="ev-battery-fill"></span>
+                </div>
+                <span id="ev-status" class="ev-status">Charger ready</span>
+            </div>
+
+            <div class="ev-readings">
+                <div class="ev-reading">
+                    <span id="ev-power-label" class="ev-reading-label">Charging speed</span>
+                    <strong id="ev-power-value" class="ev-reading-value">-- kW</strong>
+                </div>
+                <div class="ev-reading">
+                    <span id="ev-time-label" class="ev-reading-label">Time remaining</span>
+                    <strong id="ev-time-value" class="ev-reading-value">--</strong>
+                </div>
+                <div class="ev-reading">
+                    <span id="ev-energy-label" class="ev-reading-label">Energy delivered</span>
+                    <strong id="ev-energy-value" class="ev-reading-value">0.00 kWh</strong>
+                </div>
+                <div class="ev-reading">
+                    <span id="ev-cost-label" class="ev-reading-label">Cost</span>
+                    <strong id="ev-cost-value" class="ev-reading-value">$0.00</strong>
+                </div>
+            </div>
+
+            <footer class="ev-footer">
+                <span id="ev-mode">STANDARD</span>
+                <span id="ev-payment">CASH</span>
+            </footer>
+
+            <div id="ev-action" class="ev-action">Charger ready</div>
+        </section>
+
+        <section id="checkout-panel" class="checkout-panel" aria-modal="true" aria-labelledby="checkout-title" hidden>
+            <header class="checkout-header">
+                <h2 id="checkout-title">Options</h2>
+                <button id="checkout-cancel" class="checkout-cancel" type="button" aria-label="Close" title="Close">&times;</button>
+            </header>
+
+            <div class="checkout-group">
+                <span id="checkout-primary-label" class="checkout-label">Type</span>
+                <div id="checkout-primary-options" class="checkout-options" role="radiogroup"></div>
+            </div>
+
+            <div class="checkout-group">
+                <span id="checkout-payment-label" class="checkout-label">Payment</span>
+                <div id="checkout-payment-options" class="checkout-options" role="radiogroup"></div>
+            </div>
+
+            <div class="checkout-footer">
+                <span id="checkout-summary" class="checkout-summary"></span>
+                <button id="checkout-confirm" class="checkout-confirm" type="button">Confirm</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js?v=9"></script>
+    <script src="ev.js?v=12"></script>
+    <script src="checkout.js?v=10"></script>
+</body>
+</html>

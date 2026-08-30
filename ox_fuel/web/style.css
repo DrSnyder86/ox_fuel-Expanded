@@ -1,0 +1,2684 @@
+:root {
+    --brand-accent: #56c596;
+    --panel: rgba(18, 20, 22, 0.96);
+    --text: #f5f6f2;
+    --muted: #a9afb3;
+    --state-color: #d2a34c;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: transparent;
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+    letter-spacing: 0;
+    user-select: none;
+}
+
+body.local-preview {
+    background: #6f7477;
+}
+
+body.local-preview .fuel-meter {
+    top: 24px;
+    bottom: auto;
+}
+
+.fuel-meter {
+    position: fixed;
+    left: max(14px, calc(50% - 170px));
+    bottom: 5.5vh;
+    width: min(340px, calc(100vw - 28px));
+    min-height: 120px;
+    padding: 8px;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
+    opacity: 0;
+    transition: opacity 160ms ease;
+    pointer-events: none;
+}
+
+.fuel-meter.is-visible {
+    opacity: 1;
+}
+
+.register-details {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    min-height: 40px;
+    margin-top: 2px;
+    padding: 6px;
+    background: #0d1112;
+    border: 1px solid var(--register-detail-rule, #555d60);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+
+.register-detail-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.meter-title,
+.meter-phase,
+.meter-choice,
+.tank-level,
+.register-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.meter-title {
+    color: var(--state-color);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    transition: color 160ms ease, opacity 160ms ease;
+}
+
+.meter-phase {
+    color: var(--register-detail-muted, #a9afb3);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.meter-choice {
+    max-width: 100%;
+    color: var(--register-detail-text, #e5e8e7);
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.tank-level {
+    color: var(--level-color, var(--register-detail-text, #e5e8e7));
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    text-transform: uppercase;
+    transition: color 160ms ease;
+}
+
+.tank-level.is-unavailable {
+    color: var(--register-detail-muted, #a9afb3);
+}
+
+.meter-body {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr);
+    align-items: stretch;
+    gap: 6px;
+    min-height: 116px;
+}
+
+.pump-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 116px;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.pump-logo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: auto;
+    object-fit: contain;
+}
+
+.meter-content {
+    display: grid;
+    align-content: start;
+    min-width: 0;
+}
+
+.fuel-meter[data-brand='none'] .meter-body {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.fuel-meter[data-brand='none'] .pump-logo {
+    display: none;
+}
+
+.pump-register {
+    --register-detail-text: #e5e8e7;
+    --register-detail-muted: #aeb5b2;
+    --register-detail-rule: #555d60;
+    display: grid;
+    align-self: start;
+    gap: 4px;
+    min-width: 0;
+    padding: 6px;
+    background: #262b2e;
+    border: 1px solid #62696d;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.38);
+}
+
+.register-row {
+    display: grid;
+    grid-template-columns: 51px minmax(0, 1fr);
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    min-height: 34px;
+}
+
+.register-label {
+    color: #e5e8e7;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    text-align: right;
+}
+
+.segment-display {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    height: 34px;
+    min-width: 0;
+    padding: 2px 6px;
+    overflow: hidden;
+    background: #0d1112;
+    border: 1px solid #555d60;
+    border-radius: 1px;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+
+.segment-digit {
+    position: relative;
+    flex: 0 0 15px;
+    width: 15px;
+    height: 27px;
+}
+
+.segment {
+    position: absolute;
+    background: #39403e;
+    opacity: 0.3;
+}
+
+.segment.is-on {
+    background: #d9dfda;
+    box-shadow: 0 0 3px rgba(217, 223, 218, 0.36);
+    opacity: 1;
+}
+
+.segment-a,
+.segment-d,
+.segment-g {
+    left: 2px;
+    width: 11px;
+    height: 3px;
+    clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
+}
+
+.segment-a {
+    top: 0;
+}
+
+.segment-g {
+    top: 12px;
+}
+
+.segment-d {
+    bottom: 0;
+}
+
+.segment-b,
+.segment-c,
+.segment-e,
+.segment-f {
+    width: 3px;
+    height: 11px;
+    clip-path: polygon(50% 0, 100% 14%, 100% 86%, 50% 100%, 0 86%, 0 14%);
+}
+
+.segment-b,
+.segment-c {
+    right: 0;
+}
+
+.segment-e,
+.segment-f {
+    left: 0;
+}
+
+.segment-b,
+.segment-f {
+    top: 2px;
+}
+
+.segment-c,
+.segment-e {
+    bottom: 2px;
+}
+
+.segment-dot {
+    flex: 0 0 3px;
+    width: 3px;
+    height: 3px;
+    margin: 0 -1px 1px;
+    align-self: flex-end;
+    background: #d9dfda;
+    box-shadow: 0 0 3px rgba(217, 223, 218, 0.36);
+}
+
+.segment-display.is-compact {
+    gap: 1px;
+}
+
+.segment-display.is-compact .segment-digit {
+    margin-inline: -1px;
+    transform: scaleX(0.86);
+}
+
+.segment-display.is-changing:not(.is-flip) .segment-digit,
+.segment-display.is-changing:not(.is-flip) .segment-dot {
+    animation: digital-settle 130ms ease-out;
+}
+
+.segment-display.is-flip {
+    gap: 2px;
+    padding-inline: 5px;
+}
+
+.flip-character {
+    position: relative;
+    display: flex;
+    flex: 0 0 17px;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 27px;
+    overflow: hidden;
+    color: #1b1c1a;
+    background: #ebe4d3;
+    border: 1px solid #6e6a60;
+    border-radius: 2px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 1px rgba(0, 0, 0, 0.45);
+    font-family: "Courier New", Consolas, monospace;
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.flip-character::after {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: 1px;
+    content: '';
+    background: rgba(34, 34, 31, 0.48);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.flip-dot {
+    flex: 0 0 5px;
+    width: 5px;
+    margin-bottom: 3px;
+    align-self: flex-end;
+    color: #ebe4d3;
+    font-family: "Courier New", Consolas, monospace;
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.segment-display.is-flip.is-compact .flip-character {
+    flex-basis: 15px;
+    width: 15px;
+    font-size: 18px;
+}
+
+.segment-display.is-flip.is-changing .flip-character,
+.segment-display.is-flip.is-changing .flip-dot {
+    animation: flip-settle 140ms ease-out;
+}
+
+@keyframes digital-settle {
+    from {
+        opacity: 0.72;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes flip-settle {
+    from {
+        opacity: 0.82;
+        transform: translateY(-1px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fuel-meter[data-theme='vintage'] {
+    --panel: rgba(39, 42, 39, 0.97);
+    --text: #f0eadb;
+    --muted: #c3bcaa;
+    background: var(--panel);
+    border: 2px solid #928b79;
+    border-radius: 3px;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(232, 222, 194, 0.12);
+}
+
+.fuel-meter[data-theme='vintage'] .register-details {
+    background: #191b18;
+    border-color: #6f6a5d;
+}
+
+.fuel-meter[data-theme='vintage'] .meter-title,
+.fuel-meter[data-theme='vintage'] .meter-phase,
+.fuel-meter[data-theme='vintage'] .meter-choice,
+.fuel-meter[data-theme='vintage'] .tank-level,
+.fuel-meter[data-theme='vintage'] .register-label {
+    font-family: "Courier New", Consolas, monospace;
+    font-weight: 900;
+}
+
+.fuel-meter[data-theme='vintage'] .pump-register {
+    --register-detail-text: #eee3bf;
+    --register-detail-muted: #bdb7a6;
+    --register-detail-rule: #6f6a5d;
+    background: #bbb6a7;
+    border-color: #777264;
+    box-shadow: inset 0 0 0 1px rgba(245, 239, 220, 0.35);
+}
+
+.fuel-meter[data-theme='vintage'] .register-label {
+    color: #292b28;
+}
+
+.fuel-meter[data-theme='vintage'] .segment-display {
+    background: #191b18;
+    border-color: #6f6a5d;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.72);
+}
+
+.fuel-meter[data-theme='vintage'] .segment {
+    background: #4e5048;
+    opacity: 0.24;
+}
+
+.fuel-meter[data-theme='vintage'] .segment.is-on,
+.fuel-meter[data-theme='vintage'] .segment-dot {
+    background: #eee3bf;
+    box-shadow: none;
+}
+
+/* Modern pump faces */
+.fuel-meter[data-variant='ron-modern'] {
+    --panel: #252824;
+    --text: #f2efe7;
+    --muted: #b5b7ae;
+    border: 2px solid #8f9692;
+    border-top-color: #c96f24;
+    border-top-width: 3px;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34), inset 0 0 0 1px #f6f2e8;
+}
+
+.fuel-meter[data-variant='ron-modern'] .register-details {
+    background: #191a17;
+    border-color: #765b3c;
+}
+
+.fuel-meter[data-variant='ron-modern'] .pump-register {
+    background: #353633;
+    border-color: #737974;
+    border-left-color: #c96f24;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px #161714;
+}
+
+.fuel-meter[data-variant='ron-modern'] .register-label {
+    color: #f0e9dc;
+}
+
+.fuel-meter[data-variant='ron-modern'] .segment-display {
+    background: #191a17;
+    border-color: #765b3c;
+}
+
+.fuel-meter[data-variant='ron-modern'] .segment {
+    background: #664c31;
+}
+
+.fuel-meter[data-variant='ron-modern'] .segment.is-on,
+.fuel-meter[data-variant='ron-modern'] .segment-dot {
+    background: #f0ad49;
+    box-shadow: 0 0 4px rgba(240, 173, 73, 0.42);
+}
+
+.fuel-meter[data-variant='globe-modern'] {
+    --panel: #222523;
+    --text: #f3f0e9;
+    --muted: #b5b7b1;
+    border: 2px solid #979d99;
+    border-top-color: #b93430;
+    border-top-width: 3px;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34), inset 0 0 0 1px #ffffff;
+}
+
+.fuel-meter[data-variant='globe-modern'] .register-details {
+    background: #101211;
+    border-color: #777b77;
+}
+
+.fuel-meter[data-variant='globe-modern'] .pump-register {
+    background: #292b2a;
+    border-color: #737975;
+    border-right-color: #b93430;
+    box-shadow: inset 0 0 0 1px #111312;
+}
+
+.fuel-meter[data-variant='globe-modern'] .register-label {
+    color: #f4f1e8;
+}
+
+.fuel-meter[data-variant='globe-modern'] .segment-display {
+    background: #101211;
+    border-color: #777b77;
+}
+
+.fuel-meter[data-variant='globe-modern'] .segment.is-on,
+.fuel-meter[data-variant='globe-modern'] .segment-dot {
+    background: #f2eee2;
+    box-shadow: 0 0 3px rgba(242, 238, 226, 0.35);
+}
+
+.fuel-meter[data-variant='ltd-modern'] {
+    --panel: #222741;
+    --text: #f3f1eb;
+    --muted: #b9bdca;
+    border: 2px solid #9ba0aa;
+    border-top-color: #242b56;
+    border-bottom-color: #bd343b;
+    border-bottom-width: 3px;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34), inset 0 0 0 1px #ffffff;
+}
+
+.fuel-meter[data-variant='ltd-modern'] .register-details {
+    background: #101328;
+    border-color: #727996;
+}
+
+.fuel-meter[data-variant='ltd-modern'] .pump-register {
+    background: #242b50;
+    border-color: #7c8293;
+    border-right-color: #bd343b;
+    border-radius: 1px;
+    box-shadow: inset 0 0 0 1px #0f132a;
+}
+
+.fuel-meter[data-variant='ltd-modern'] .register-label {
+    color: #f4f2e9;
+}
+
+.fuel-meter[data-variant='ltd-modern'] .segment-display {
+    background: #101328;
+    border-color: #727996;
+}
+
+.fuel-meter[data-variant='ltd-modern'] .segment {
+    background: #343b61;
+}
+
+.fuel-meter[data-variant='ltd-modern'] .segment.is-on,
+.fuel-meter[data-variant='ltd-modern'] .segment-dot {
+    background: #eef1f3;
+    box-shadow: 0 0 4px rgba(238, 241, 243, 0.38);
+}
+
+.fuel-meter[data-variant='xero-modern'] {
+    --panel: #1d2020;
+    --text: #f2f4f1;
+    --muted: #aab3b1;
+    border: 2px solid #6f797a;
+    border-bottom-color: #b94148;
+    border-left-width: 3px;
+    border-left-color: #4dbbc4;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38), inset 0 0 0 1px #363c3c;
+}
+
+.fuel-meter[data-variant='xero-modern'] .register-details {
+    background: #080b0b;
+    border-color: #3d7276;
+}
+
+.fuel-meter[data-variant='xero-modern'] .pump-register {
+    background: #111414;
+    border-color: #515c5d;
+    border-right-color: #4dbbc4;
+    border-radius: 1px;
+    box-shadow: inset 0 0 0 1px #050707;
+}
+
+.fuel-meter[data-variant='xero-modern'] .segment-display {
+    background: #080b0b;
+    border-color: #3d7276;
+}
+
+.fuel-meter[data-variant='xero-modern'] .segment {
+    background: #26494b;
+}
+
+.fuel-meter[data-variant='xero-modern'] .segment.is-on,
+.fuel-meter[data-variant='xero-modern'] .segment-dot {
+    background: #71d5dc;
+    box-shadow: 0 0 4px rgba(113, 213, 220, 0.42);
+}
+
+.fuel-meter[data-variant='charge-modern'] {
+	--panel: #080d13;
+	--text: #edf4f8;
+	--muted: #98a7b2;
+	--state-color: #29bfff;
+	border: 2px solid #8c989f;
+	border-top-color: #1bb9ff;
+	border-bottom-color: #79142a;
+	box-shadow: 0 14px 30px rgba(0, 0, 0, 0.44), inset 0 0 0 1px #1e2b35;
+}
+
+.fuel-meter[data-variant='charge-modern'] .pump-register {
+	--register-detail-text: #dce7ed;
+	--register-detail-muted: #9baab4;
+	--register-detail-rule: #455966;
+	background: #111a22;
+	border-color: #667680;
+	border-right-color: #1bb9ff;
+	box-shadow: inset 0 0 0 1px #03070a;
+}
+
+.fuel-meter[data-variant='charge-modern'] .register-details,
+.fuel-meter[data-variant='charge-modern'] .segment-display {
+	background: #04090d;
+	border-color: #405767;
+}
+
+.fuel-meter[data-variant='charge-modern'] .register-label {
+	color: #dce7ed;
+}
+
+.fuel-meter[data-variant='charge-modern'] .segment {
+	background: #11344a;
+}
+
+.fuel-meter[data-variant='charge-modern'] .segment.is-on,
+.fuel-meter[data-variant='charge-modern'] .segment-dot {
+	background: #27c2ff;
+	box-shadow: 0 0 4px rgba(39, 194, 255, 0.48);
+}
+
+/* Vintage pump faces */
+.fuel-meter[data-variant='xero-vintage'] {
+    --panel: #263332;
+    --text: #f1eee5;
+    --muted: #b7bcb7;
+    border-color: #89877b;
+    border-bottom-color: #a7484d;
+    border-left-width: 3px;
+    border-left-color: #4f8f91;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4), inset 0 0 0 2px #eee7d4;
+}
+
+.fuel-meter[data-variant='xero-vintage'] .register-details {
+    border-color: #6f6a5d;
+}
+
+.fuel-meter[data-variant='xero-vintage'] .meter-phase {
+    color: var(--register-detail-muted);
+}
+
+.fuel-meter[data-variant='xero-vintage'] .pump-register {
+    background: #bdb5a0;
+    border-color: #777468;
+    border-right-color: #4f8f91;
+}
+
+.fuel-meter[data-variant='globe-vintage'] {
+    --panel: #302c2b;
+    --text: #f4ede1;
+    --muted: #c2b8aa;
+    border-color: #8c8678;
+    border-top-color: #a94339;
+    border-top-width: 3px;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4), inset 0 0 0 2px #eee6d1;
+}
+
+.fuel-meter[data-variant='globe-vintage'] .register-details {
+    border-color: #6f6a5d;
+}
+
+.fuel-meter[data-variant='globe-vintage'] .meter-phase {
+    color: var(--register-detail-muted);
+}
+
+.fuel-meter[data-variant='globe-vintage'] .pump-register {
+    background: #bcb29e;
+    border-color: #777064;
+    border-right-color: #a94339;
+}
+
+.fuel-meter[data-variant='ltd-vintage'] {
+    --panel: #29304a;
+    --text: #f0ead9;
+    --muted: #cbc3ad;
+    border-color: #a8a18f;
+    border-bottom-color: #bd4a4c;
+    border-bottom-width: 3px;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.42), inset 0 0 0 1px #4c5369;
+}
+
+.fuel-meter[data-variant='ltd-vintage'] .register-details {
+    border-color: #6f6a5d;
+}
+
+.fuel-meter[data-variant='ltd-vintage'] .pump-register {
+    background: #bcb49f;
+    border-color: #777164;
+    border-right-color: #bd4a4c;
+}
+
+.fuel-meter.is-low {
+    --level-color: #c84f4f;
+}
+
+.fuel-meter.is-mid {
+    --level-color: #c99a3c;
+}
+
+.fuel-meter[data-state='ready'] {
+    --state-color: #a87a2f;
+}
+
+.fuel-meter[data-state='fueling'] {
+    --state-color: var(--brand-accent);
+}
+
+.fuel-meter[data-state='fueling'] .meter-title {
+    animation: fueling-status 1.35s ease-in-out infinite;
+}
+
+.fuel-meter[data-state='complete'],
+.fuel-meter.is-complete {
+    --level-color: #4f9a70;
+    --state-color: #3f895f;
+}
+
+.fuel-meter[data-state='stopped'] {
+    --state-color: #b44f4f;
+}
+
+.fuel-meter[data-grade='premium'] .meter-choice,
+.fuel-meter[data-grade='premium'] .meter-phase.is-choice {
+    color: #b88a30;
+}
+
+@keyframes fueling-status {
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.66;
+    }
+}
+
+@media (max-width: 460px) {
+    .fuel-meter {
+        padding-inline: 8px;
+    }
+
+    .meter-body {
+        grid-template-columns: clamp(96px, 30vw, 122px) minmax(0, 1fr);
+        gap: 6px;
+    }
+
+    .meter-phase {
+        font-size: 8px;
+    }
+
+    .pump-logo {
+        min-height: 112px;
+    }
+
+    .pump-register {
+        padding: 5px;
+    }
+
+    .register-row {
+        grid-template-columns: 48px minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    .register-label {
+        font-size: 10px;
+    }
+
+    .segment-display {
+        padding-inline: 4px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fuel-meter,
+    .meter-title,
+    .tank-level {
+        transition: none;
+    }
+
+    .fuel-meter[data-state='fueling'] .meter-title,
+    .segment-display.is-changing .segment-digit,
+    .segment-display.is-changing .segment-dot,
+    .segment-display.is-changing .flip-character,
+    .segment-display.is-changing .flip-dot {
+        animation: none;
+    }
+}
+
+/* In-register checkout and dedicated EV terminal */
+[hidden] {
+    display: none !important;
+}
+
+.fuel-meter {
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.fuel-meter.is-checkout {
+    width: min(390px, calc(100vw - 28px));
+    min-height: 240px;
+    pointer-events: auto;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) {
+    --checkout-logo-width: 128px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .meter-body {
+    grid-template-columns: var(--checkout-logo-width) minmax(0, 1fr);
+    min-height: 224px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .pump-logo {
+    min-height: 224px;
+}
+
+.checkout-panel {
+    position: absolute;
+    z-index: 5;
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
+    left: calc(8px + var(--checkout-logo-width, 128px) + 6px);
+    display: grid;
+    grid-template-rows: auto auto auto minmax(36px, 1fr);
+    align-content: start;
+    gap: 7px;
+    min-width: 0;
+    padding: 8px;
+    color: #edf1ef;
+    background: #101517;
+    border: 1px solid #596164;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px #050707, 0 4px 12px rgba(0, 0, 0, 0.24);
+}
+
+.fuel-meter[data-brand='none'] .checkout-panel {
+    left: 8px;
+}
+
+.checkout-header,
+.checkout-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.checkout-header {
+    min-height: 25px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #424a4d;
+}
+
+.checkout-header h2 {
+    margin: 0;
+    overflow: hidden;
+    color: #f5f7f5;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.checkout-cancel {
+    display: grid;
+    place-items: center;
+    width: 23px;
+    height: 23px;
+    padding: 0;
+    color: #aab3b4;
+    background: transparent;
+    border: 1px solid #4b5457;
+    border-radius: 2px;
+    font: 18px/1 Arial, sans-serif;
+    cursor: pointer;
+}
+
+.checkout-cancel:hover,
+.checkout-cancel:focus-visible {
+    color: #fff;
+    border-color: #aeb6b7;
+    outline: none;
+}
+
+.checkout-group {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.checkout-label {
+    overflow: hidden;
+    color: #9da7a8;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.checkout-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    min-width: 0;
+}
+
+.checkout-option {
+    display: grid;
+    align-content: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: 46px;
+    padding: 5px 6px;
+    overflow: hidden;
+    color: #dce1df;
+    text-align: left;
+    background: #20272a;
+    border: 1px solid #424c4f;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+    cursor: pointer;
+}
+
+.checkout-option:hover {
+    border-color: #737e81;
+}
+
+.checkout-option:focus-visible {
+    border-color: #f1f4f2;
+    outline: 1px solid #f1f4f2;
+    outline-offset: 1px;
+}
+
+.checkout-option.is-selected {
+    color: #fff;
+    background: #283033;
+    border-color: var(--brand-accent);
+    box-shadow: inset 3px 0 0 var(--brand-accent), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.checkout-option-name,
+.checkout-option-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.checkout-option-name {
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.checkout-option-meta {
+    color: #98a3a4;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 8px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.checkout-option.is-selected .checkout-option-meta {
+    color: #cbd2d0;
+}
+
+.checkout-footer {
+    align-self: end;
+    grid-template-columns: minmax(0, 1fr) 78px;
+    padding-top: 6px;
+    border-top: 1px solid #424a4d;
+}
+
+.checkout-summary {
+    display: -webkit-box;
+    min-width: 0;
+    max-height: 26px;
+    overflow: hidden;
+    color: #aeb7b6;
+    font-size: 8px;
+    font-weight: 650;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.checkout-confirm {
+    min-width: 0;
+    height: 30px;
+    padding: 0 8px;
+    overflow: hidden;
+    color: #f7f9f7;
+    background: #2c3436;
+    border: 1px solid var(--brand-accent);
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 850;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.checkout-confirm:hover,
+.checkout-confirm:focus-visible {
+    color: #fff;
+    background: #394345;
+    outline: 1px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 1px;
+}
+
+.checkout-confirm:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-panel {
+    color: #191816;
+    background: #c1b8a3;
+    border-color: #6f695d;
+    box-shadow: inset 0 0 0 1px #e5decc, 0 4px 10px rgba(0, 0, 0, 0.22);
+    font-family: "Courier New", Courier, monospace;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-header,
+.fuel-meter[data-theme='vintage'] .checkout-footer {
+    border-color: #7b7466;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-header h2,
+.fuel-meter[data-theme='vintage'] .checkout-label {
+    color: #29261f;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-cancel {
+    color: #4a463e;
+    border-color: #777063;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-option {
+    color: #25221d;
+    background: #e5deca;
+    border-color: #7f786a;
+    box-shadow: inset 0 0 0 1px #f3eddd;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-option:hover,
+.fuel-meter[data-theme='vintage'] .checkout-option:focus-visible {
+    border-color: #25221d;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-option.is-selected {
+    color: #f6f1e5;
+    background: #252724;
+    border-color: var(--brand-accent);
+    box-shadow: inset 3px 0 0 var(--brand-accent);
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-option-meta,
+.fuel-meter[data-theme='vintage'] .checkout-summary {
+    color: #5d584d;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-option.is-selected .checkout-option-meta {
+    color: #d9d4c8;
+}
+
+.fuel-meter[data-theme='vintage'] .checkout-confirm {
+    color: #f6f1e5;
+    background: #292b28;
+}
+
+.fuel-meter.is-electric {
+    width: min(390px, calc(100vw - 28px));
+    min-height: 194px;
+    padding: 8px;
+    color: #e9f6fa;
+    background: #071016;
+    border: 1px solid #52626b;
+    border-top: 2px solid #27bde9;
+    border-bottom-color: #8a2448;
+    border-left-color: #267796;
+    border-radius: 4px;
+    box-shadow: 0 15px 34px rgba(0, 0, 0, 0.42), inset 0 0 0 1px #152630;
+}
+
+.fuel-meter.is-electric .meter-body {
+    display: none;
+}
+
+.ev-terminal {
+    display: grid;
+    grid-template-rows: auto auto auto 1fr auto;
+    gap: 8px;
+    min-height: 176px;
+    padding: 8px 10px;
+    overflow: hidden;
+    background: #0a151c;
+    border: 1px solid #354852;
+    border-radius: 2px;
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.38);
+    font-family: Consolas, "Courier New", monospace;
+}
+
+.ev-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: 33px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid #29424f;
+}
+
+.ev-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.ev-brand img {
+    display: block;
+    width: auto;
+    max-width: 110px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.ev-brand-name {
+    overflow: hidden;
+    color: #a9bcc5;
+    font-size: 8px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ev-status {
+    color: #59d6f6;
+    font-size: 9px;
+    font-weight: 850;
+    text-align: right;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ev-battery-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px;
+}
+
+.ev-battery-label {
+    padding-bottom: 4px;
+    color: #91a4ad;
+    font-size: 9px;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.ev-battery-value {
+    color: #f2fbfd;
+    font-size: 32px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    line-height: 0.9;
+}
+
+.ev-battery-track {
+    height: 5px;
+    overflow: hidden;
+    background: #18272e;
+    border: 1px solid #30444d;
+    border-radius: 1px;
+}
+
+.ev-battery-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: #2bc1ea;
+    box-shadow: 0 0 7px rgba(43, 193, 234, 0.42);
+    transition: width 180ms linear;
+}
+
+.fuel-meter.is-electric.is-low .ev-battery-fill {
+    background: #df5278;
+    box-shadow: 0 0 7px rgba(223, 82, 120, 0.38);
+}
+
+.fuel-meter.is-electric.is-complete .ev-battery-fill {
+    background: #61d69a;
+}
+
+.ev-readings {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+    min-width: 0;
+    padding: 8px 0 7px;
+    border-top: 1px solid #20333d;
+    border-bottom: 1px solid #20333d;
+}
+
+.ev-reading {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    padding: 0 9px;
+    border-right: 1px solid #2b3f49;
+}
+
+.ev-reading:first-child {
+    padding-left: 0;
+}
+
+.ev-reading:last-child {
+    padding-right: 0;
+    border-right: 0;
+}
+
+.ev-reading-label {
+    overflow: hidden;
+    color: #78919d;
+    font-size: 8px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ev-reading-value {
+    overflow: hidden;
+    color: #dcf7fc;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ev-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    color: #9bb0b8;
+    font-size: 9px;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.ev-footer span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fuel-meter.is-electric.is-checkout {
+    min-height: 274px;
+}
+
+.fuel-meter.is-electric.is-checkout .ev-terminal {
+    min-height: 256px;
+}
+
+.fuel-meter.is-electric .checkout-panel {
+    top: 54px;
+    left: 8px;
+    color: #e8f7fb;
+    background: #09151c;
+    border-color: #34515e;
+    box-shadow: inset 0 0 0 1px #071016, 0 6px 16px rgba(0, 0, 0, 0.32);
+    font-family: Consolas, "Courier New", monospace;
+}
+
+.fuel-meter.is-electric .checkout-header,
+.fuel-meter.is-electric .checkout-footer {
+    border-color: #294650;
+}
+
+.fuel-meter.is-electric .checkout-header h2 {
+    color: #dff8fc;
+}
+
+.fuel-meter.is-electric .checkout-label {
+    color: #78a7b9;
+}
+
+.fuel-meter.is-electric .checkout-option {
+    color: #cce4ea;
+    background: #10222b;
+    border-color: #2c4a57;
+}
+
+.fuel-meter.is-electric .checkout-option:hover {
+    border-color: #5a899b;
+}
+
+.fuel-meter.is-electric .checkout-option.is-selected {
+    color: #f0fcff;
+    background: #15303b;
+    border-color: #27bde9;
+    box-shadow: inset 3px 0 0 #27bde9;
+}
+
+.fuel-meter.is-electric .checkout-option-meta,
+.fuel-meter.is-electric .checkout-summary {
+    color: #86a9b6;
+}
+
+.fuel-meter.is-electric .checkout-option.is-selected .checkout-option-meta {
+    color: #b7d9e3;
+}
+
+.fuel-meter.is-electric .checkout-confirm {
+    color: #eafaff;
+    background: #15303b;
+    border-color: #27bde9;
+}
+
+@media (max-width: 460px) {
+    .fuel-meter.is-checkout:not(.is-electric) {
+        --checkout-logo-width: clamp(96px, 30vw, 122px);
+    }
+
+    .checkout-panel {
+        padding: 7px;
+    }
+
+    .checkout-option {
+        padding-inline: 4px;
+    }
+
+    .checkout-option-name {
+        font-size: 10px;
+    }
+
+    .checkout-option-meta,
+    .checkout-summary {
+        font-size: 7px;
+    }
+
+    .ev-brand-name {
+        display: none;
+    }
+
+    .ev-reading {
+        padding-inline: 6px;
+    }
+
+    .ev-reading-value {
+        font-size: 12px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ev-battery-fill {
+        transition: none;
+    }
+}
+
+/* Register controls and portrait charger display */
+.register-details {
+    display: grid;
+    grid-template-columns: 38px 52px minmax(0, 1fr);
+    gap: 0;
+    min-height: 44px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.register-detail-cell {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    min-width: 0;
+    min-height: 42px;
+    padding: 4px;
+    border-right: 1px solid var(--register-detail-rule, #555d60);
+}
+
+.register-detail-cell:last-child {
+    border-right: 0;
+}
+
+.register-status {
+    color: var(--state-color);
+}
+
+.status-icon {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.2;
+}
+
+.register-status[data-state='fueling'] {
+    color: var(--brand-accent);
+    animation: fueling-status 1.35s ease-in-out infinite;
+}
+
+.register-status[data-state='complete'] {
+    color: #60ba82;
+}
+
+.register-status[data-state='stopped'] {
+    color: #d45b5b;
+}
+
+.register-level {
+    gap: 2px;
+}
+
+.tank-level-label,
+.tank-level-value {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tank-level-label {
+    color: var(--register-detail-muted, #a9afb3);
+    font-size: 7px;
+    font-weight: 800;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.tank-level-value {
+    color: var(--level-color, var(--register-detail-text, #e5e8e7));
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.tank-level-value.is-unavailable {
+    color: var(--register-detail-muted, #a9afb3);
+}
+
+.register-transaction {
+    gap: 4px;
+    justify-items: end;
+    padding-inline: 5px;
+}
+
+.register-transaction .meter-phase {
+    max-width: 100%;
+    font-size: 8px;
+}
+
+.register-transaction .meter-choice {
+    max-width: 100%;
+    font-size: 8px;
+}
+
+.fuel-meter[data-theme='vintage'] .tank-level-label,
+.fuel-meter[data-theme='vintage'] .tank-level-value,
+.fuel-meter[data-theme='vintage'] .register-transaction {
+    font-family: "Courier New", Courier, monospace;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) {
+    --checkout-logo-width: 128px;
+    width: min(340px, calc(100vw - 28px));
+    min-height: 184px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .meter-body {
+    grid-template-columns: var(--checkout-logo-width) minmax(0, 1fr);
+    min-height: 168px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .pump-logo {
+    min-height: 168px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-panel {
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
+    left: calc(8px + var(--checkout-logo-width) + 6px);
+    grid-template-rows: 17px 55px 39px 29px;
+    gap: 4px;
+    padding: 5px;
+    color: var(--register-detail-text, #e5e8e7);
+    background: #0d1112;
+    border-color: var(--register-detail-rule, #555d60);
+    border-radius: 1px;
+    box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.72);
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.fuel-meter.is-checkout[data-brand='none'] .checkout-panel {
+    left: 8px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-header {
+    min-height: 17px;
+    padding: 0 0 3px;
+    border-color: #424a4d;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-header h2 {
+    color: var(--register-detail-text, #e5e8e7);
+    font-size: 8px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-cancel {
+    width: 16px;
+    height: 16px;
+    color: #aeb5b2;
+    border-color: #4f585a;
+    font-size: 10px;
+    line-height: 1;
+    overflow: hidden;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-group {
+    align-content: start;
+    gap: 3px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-label {
+    color: var(--register-detail-muted, #aeb5b2);
+    font-size: 7px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-options {
+    gap: 4px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option {
+    min-height: 28px;
+    padding: 3px 4px;
+    color: #dce1df;
+    background: #22292b;
+    border-color: #4b5558;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.32);
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option.has-badge {
+    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-rows: 1fr 1fr;
+    align-content: stretch;
+    column-gap: 4px;
+    row-gap: 0;
+    min-height: 44px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option-badge {
+    grid-row: 1 / 3;
+    align-self: center;
+    font-family: Arial, sans-serif;
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option-name {
+    align-self: end;
+    font-size: 8px;
+    text-transform: uppercase;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option-meta {
+    align-self: start;
+    font-size: 6px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='primary'][data-option-id='regular'] {
+    color: #f6fff9;
+    background: #26734c;
+    border-color: #4fa777;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='primary'][data-option-id='premium'] {
+    color: #fffbee;
+    background: #9c7220;
+    border-color: #d0a33c;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='primary'].is-selected {
+    border-color: #fff;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.82), 0 0 0 1px var(--brand-accent);
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='payment'].is-selected {
+    color: #fff;
+    background: #30383a;
+    border-color: var(--brand-accent);
+    box-shadow: inset 3px 0 0 var(--brand-accent);
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-footer {
+    display: block;
+    padding: 0;
+    border: 0;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-summary {
+    display: none;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-confirm {
+    width: 100%;
+    height: 29px;
+    color: #fff;
+    background: #343c3e;
+    border-color: var(--brand-accent);
+    font-size: 10px;
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-panel {
+    color: #eee9dc;
+    background: #191b18;
+    border-color: #6f6a5d;
+    box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.68);
+    font-family: "Courier New", Courier, monospace;
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-header h2,
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-label {
+    color: #d2ccbc;
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-option:not([data-group='primary']) {
+    color: #eee9dc;
+    background: #292b27;
+    border-color: #686458;
+    box-shadow: inset 0 0 0 1px #181a17;
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-option.is-selected .checkout-option-meta {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.fuel-meter.is-electric {
+    width: min(250px, calc(100vw - 28px));
+    min-height: 322px;
+    padding: 6px;
+    color: #181c1b;
+    background: #101516;
+    border: 1px solid #697273;
+    border-top: 3px solid #111718;
+    border-bottom-color: #111718;
+    border-left-color: #111718;
+    border-radius: 4px;
+    box-shadow: 0 15px 34px rgba(0, 0, 0, 0.44), inset 0 0 0 1px #2a3334;
+}
+
+.ev-terminal {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr auto auto auto;
+    gap: 9px;
+    min-height: 304px;
+    padding: 8px 9px;
+    color: #1c211f;
+    background: #f5f7f5;
+    border: 1px solid #cbd0ce;
+    border-radius: 2px;
+    box-shadow: none;
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.ev-terminal > :not(.ev-wallpaper) {
+    position: relative;
+    z-index: 1;
+}
+
+.ev-wallpaper {
+    position: absolute;
+    z-index: 0;
+    inset: 38px 16px 44px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.ev-wallpaper img {
+    display: block;
+    width: 175px;
+    height: 175px;
+    object-fit: contain;
+    opacity: 0.055;
+    filter: grayscale(0.25);
+}
+
+.ev-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    min-height: 18px;
+    padding: 0 1px 5px;
+    color: #2d3431;
+    border-bottom: 1px solid #d3d7d5;
+}
+
+.ev-header span,
+.ev-header time {
+    overflow: hidden;
+    font-size: 7px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ev-charge-summary {
+    display: grid;
+    align-content: center;
+    gap: 9px;
+    min-height: 88px;
+    padding: 4px 2px;
+    text-align: center;
+}
+
+.ev-battery-value {
+    color: #101312;
+    font-size: 43px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    line-height: 1;
+}
+
+.ev-battery-track {
+    height: 10px;
+    overflow: hidden;
+    background: #d9dddb;
+    border: 0;
+    border-radius: 3px;
+}
+
+.ev-battery-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: #2f9c58;
+    box-shadow: none;
+    transition: width 180ms linear;
+}
+
+.fuel-meter.is-electric.is-low .ev-battery-fill {
+    background: #c84f4f;
+    box-shadow: none;
+}
+
+.fuel-meter.is-electric.is-complete .ev-battery-fill {
+    background: #287f4a;
+}
+
+.ev-status {
+    color: #505754;
+    font-size: 8px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.ev-readings {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #d4d8d6;
+    border-radius: 2px;
+}
+
+.ev-reading,
+.ev-reading:first-child,
+.ev-reading:last-child {
+    display: grid;
+    align-content: center;
+    gap: 4px;
+    min-width: 0;
+    min-height: 48px;
+    padding: 6px;
+    text-align: center;
+    border: 0;
+    border-right: 1px solid #d4d8d6;
+    border-bottom: 1px solid #d4d8d6;
+}
+
+.ev-reading:nth-child(2n) {
+    border-right: 0;
+}
+
+.ev-reading:nth-child(n + 3) {
+    border-bottom: 0;
+}
+
+.ev-reading-label {
+    overflow: hidden;
+    color: #626a66;
+    font-size: 6px;
+    font-weight: 650;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.ev-reading-value {
+    overflow: hidden;
+    color: #202522;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ev-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    padding-inline: 2px;
+    color: #68706c;
+    font-size: 7px;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.ev-action {
+    display: grid;
+    place-items: center;
+    min-height: 29px;
+    padding: 4px 8px;
+    overflow: hidden;
+    color: #fff;
+    background: #2f9c58;
+    border-radius: 2px;
+    font-size: 8px;
+    font-weight: 750;
+    text-align: center;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ev-terminal[data-state='complete'] .ev-action {
+    background: #287f4a;
+}
+
+.ev-terminal[data-state='stopped'] .ev-action {
+    background: #a44545;
+}
+
+.fuel-meter.is-electric.is-checkout {
+    width: min(250px, calc(100vw - 28px));
+    min-height: 344px;
+}
+
+.fuel-meter.is-electric.is-checkout .ev-terminal {
+    min-height: 326px;
+}
+
+.fuel-meter.is-electric .checkout-panel {
+    top: 33px;
+    right: 6px;
+    bottom: 6px;
+    left: 6px;
+    grid-template-rows: auto auto auto minmax(52px, 1fr);
+    gap: 8px;
+    padding: 9px;
+    color: #202522;
+    background: rgba(247, 249, 247, 0.96);
+    border: 0;
+    border-radius: 1px;
+    box-shadow: none;
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.fuel-meter.is-electric .checkout-header,
+.fuel-meter.is-electric .checkout-footer {
+    border-color: #d1d6d3;
+}
+
+.fuel-meter.is-electric .checkout-header h2 {
+    color: #232825;
+    font-size: 10px;
+}
+
+.fuel-meter.is-electric .checkout-cancel {
+    color: #59615d;
+    border-color: #b7bfbb;
+}
+
+.fuel-meter.is-electric .checkout-label {
+    color: #68716d;
+    font-size: 7px;
+}
+
+.fuel-meter.is-electric .checkout-option {
+    min-height: 48px;
+    color: #2b312e;
+    background: rgba(255, 255, 255, 0.8);
+    border-color: #bcc4c0;
+    box-shadow: none;
+}
+
+.fuel-meter.is-electric .checkout-option:hover,
+.fuel-meter.is-electric .checkout-option:focus-visible {
+    border-color: #5f936f;
+}
+
+.fuel-meter.is-electric .checkout-option.is-selected {
+    color: #fff;
+    background: #2f8f52;
+    border-color: #287b47;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+}
+
+.fuel-meter.is-electric .checkout-option-meta,
+.fuel-meter.is-electric .checkout-summary {
+    color: #69716d;
+}
+
+.fuel-meter.is-electric .checkout-option.is-selected .checkout-option-meta {
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.fuel-meter.is-electric .checkout-footer {
+    align-self: end;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding-top: 7px;
+}
+
+.fuel-meter.is-electric .checkout-summary {
+    display: block;
+    max-height: 22px;
+    font-size: 7px;
+    text-align: center;
+}
+
+.fuel-meter.is-electric .checkout-confirm {
+    width: 100%;
+    height: 32px;
+    color: #fff;
+    background: #2f9c58;
+    border-color: #287b47;
+    font-size: 9px;
+}
+
+.fuel-meter.is-electric .checkout-confirm:hover,
+.fuel-meter.is-electric .checkout-confirm:focus-visible {
+    background: #287f4a;
+}
+
+@media (max-width: 460px) {
+    .fuel-meter.is-checkout:not(.is-electric) {
+        --checkout-logo-width: clamp(96px, 30vw, 122px);
+    }
+
+    .fuel-meter.is-checkout:not(.is-electric) .checkout-option.has-badge {
+        grid-template-columns: 24px minmax(0, 1fr);
+        column-gap: 2px;
+    }
+
+    .fuel-meter.is-checkout:not(.is-electric) .checkout-option-badge {
+        font-size: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .register-status[data-state='fueling'] {
+        animation: none;
+    }
+}
+
+/* Matched live and checkout footprints */
+.register-details {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.register-transaction {
+    justify-items: center;
+    padding-inline: 3px;
+    text-align: center;
+}
+
+.register-transaction .meter-phase {
+    font-size: 8px;
+    font-weight: 850;
+    text-align: center;
+}
+
+.register-transaction .meter-choice {
+    font-size: 7px;
+    text-align: center;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) {
+    --checkout-register-background: #262b2e;
+    --checkout-register-border: #62696d;
+    --checkout-register-border-left: var(--checkout-register-border);
+    --checkout-register-border-right: var(--checkout-register-border);
+    --checkout-register-radius: 2px;
+    --checkout-register-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.38);
+    min-height: 137px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .meter-body,
+.fuel-meter.is-checkout:not(.is-electric) .pump-logo {
+    min-height: 137px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-panel {
+    grid-template-rows: 16px 48px 25px 25px;
+    gap: 3px;
+    padding: 4px;
+    background: var(--checkout-register-background);
+    border-color: var(--checkout-register-border);
+    border-left-color: var(--checkout-register-border-left);
+    border-right-color: var(--checkout-register-border-right);
+    border-radius: var(--checkout-register-radius);
+    box-shadow: var(--checkout-register-shadow);
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-header {
+    min-height: 16px;
+    padding-bottom: 2px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-group {
+    display: grid;
+    align-content: stretch;
+    gap: 0;
+}
+
+.fuel-meter.is-checkout .checkout-label {
+    display: none;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option {
+    min-height: 25px;
+    padding: 2px 4px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option.has-badge {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 21px 9px 12px;
+    align-content: center;
+    justify-items: center;
+    row-gap: 0;
+    min-height: 48px;
+    padding: 3px 4px;
+    text-align: center;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option-badge {
+    grid-row: auto;
+    align-self: center;
+    font-size: 22px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option.has-badge .checkout-option-name,
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option.has-badge .checkout-option-meta {
+    align-self: center;
+    text-align: center;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option.has-badge .checkout-option-name {
+    font-size: 8.5px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option.has-badge .checkout-option-meta {
+    display: grid;
+    place-items: center;
+    width: min(64px, 100%);
+    min-height: 11px;
+    padding: 1px 3px;
+    color: #f7f9f7;
+    background: #0a0c0b;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 1px;
+    font-size: 7.5px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='primary'].is-selected .checkout-option-meta {
+    color: #fff;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='primary'][data-option-id='regular'] {
+    color: #141611;
+    background: #e7ab12;
+    border-color: #f2c43d;
+    box-shadow: inset 0 0 0 1px rgba(255, 242, 178, 0.22);
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='primary'][data-option-id='premium'] {
+    color: #fff7f3;
+    background: #c9232b;
+    border-color: #ed5358;
+    box-shadow: inset 0 0 0 1px rgba(255, 205, 205, 0.18);
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='primary'].is-selected {
+    border-color: #fff;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.88), 0 0 0 1px var(--brand-accent);
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='payment'],
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-option[data-group='payment'] {
+    color: #202527;
+    background: #d8dcdd;
+    border-color: #f0f2f2;
+    box-shadow: inset 0 -1px 0 #a7adaf;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='payment'] .checkout-option-name,
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-option[data-group='payment'] .checkout-option-name {
+    font-size: 9px;
+    text-align: center;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='payment'] .checkout-option-meta,
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-option[data-group='payment'] .checkout-option-meta {
+    display: none;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-option[data-group='payment'].is-selected,
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-option[data-group='payment'].is-selected {
+    color: #111516;
+    background: #f1f3f3;
+    border-color: #fff;
+    box-shadow: inset 0 0 0 2px var(--brand-accent);
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-confirm {
+    height: 25px;
+    color: #f4fff7;
+    background: #087a37;
+    border-color: #2ba65c;
+    font-size: 10px;
+}
+
+.fuel-meter.is-checkout:not(.is-electric) .checkout-confirm:hover,
+.fuel-meter.is-checkout:not(.is-electric) .checkout-confirm:focus-visible {
+    background: #0a9142;
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) {
+    --checkout-register-background: #bbb6a7;
+    --checkout-register-border: #777264;
+    --checkout-register-shadow: inset 0 0 0 1px rgba(245, 239, 220, 0.35);
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-panel {
+    color: #292b28;
+    background: var(--checkout-register-background);
+    border-color: var(--checkout-register-border);
+    border-left-color: var(--checkout-register-border-left);
+    border-right-color: var(--checkout-register-border-right);
+    box-shadow: var(--checkout-register-shadow);
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-header {
+    border-color: #7b7466;
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-header h2 {
+    color: #292b28;
+}
+
+.fuel-meter[data-theme='vintage'].is-checkout:not(.is-electric) .checkout-cancel {
+    color: #4a463e;
+    border-color: #777063;
+}
+
+.fuel-meter[data-variant='ron-modern'].is-checkout:not(.is-electric) {
+    --checkout-register-background: #353633;
+    --checkout-register-border: #737974;
+    --checkout-register-border-left: #c96f24;
+    --checkout-register-radius: 4px;
+    --checkout-register-shadow: inset 0 0 0 1px #161714;
+}
+
+.fuel-meter[data-variant='globe-modern'].is-checkout:not(.is-electric) {
+    --checkout-register-background: #292b2a;
+    --checkout-register-border: #737975;
+    --checkout-register-border-right: #b93430;
+    --checkout-register-shadow: inset 0 0 0 1px #111312;
+}
+
+.fuel-meter[data-variant='ltd-modern'].is-checkout:not(.is-electric) {
+    --checkout-register-background: #242b50;
+    --checkout-register-border: #7c8293;
+    --checkout-register-border-right: #bd343b;
+    --checkout-register-radius: 1px;
+    --checkout-register-shadow: inset 0 0 0 1px #0f132a;
+}
+
+.fuel-meter[data-variant='xero-modern'].is-checkout:not(.is-electric) {
+    --checkout-register-background: #111414;
+    --checkout-register-border: #515c5d;
+    --checkout-register-border-right: #4dbbc4;
+    --checkout-register-radius: 1px;
+    --checkout-register-shadow: inset 0 0 0 1px #050707;
+}
+
+.fuel-meter[data-variant='xero-vintage'].is-checkout:not(.is-electric) {
+    --checkout-register-background: #bdb5a0;
+    --checkout-register-border: #777468;
+    --checkout-register-border-right: #4f8f91;
+}
+
+.fuel-meter[data-variant='globe-vintage'].is-checkout:not(.is-electric) {
+    --checkout-register-background: #bcb29e;
+    --checkout-register-border: #777064;
+    --checkout-register-border-right: #a94339;
+}
+
+.fuel-meter[data-variant='ltd-vintage'].is-checkout:not(.is-electric) {
+    --checkout-register-background: #bcb49f;
+    --checkout-register-border: #777164;
+    --checkout-register-border-right: #bd4a4c;
+}
+
+.fuel-meter.is-electric,
+.fuel-meter.is-electric.is-checkout {
+    width: min(220px, calc(100vw - 28px));
+    min-height: 274px;
+    padding: 6px;
+    color: #e8f0f2;
+    background: #070c10;
+    border-color: #30454f;
+    border-top-color: #2ab8df;
+    border-bottom-color: #782a47;
+    border-left-color: #30454f;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), inset 0 0 0 1px #15242b;
+}
+
+body:not(.local-preview) .fuel-meter.is-electric {
+    bottom: max(18px, 3vh);
+}
+
+body.local-preview .fuel-meter.is-electric {
+    bottom: auto;
+}
+
+.fuel-meter.is-electric .ev-terminal,
+.fuel-meter.is-electric.is-checkout .ev-terminal {
+    grid-template-rows: auto 1fr auto auto auto;
+    gap: 6px;
+    min-height: 256px;
+    padding: 6px 7px;
+    color: #e8f0f2;
+    background: #0d171c;
+    border-color: #2d424c;
+    box-shadow: inset 0 0 18px rgba(21, 74, 91, 0.12);
+}
+
+.fuel-meter.is-electric .ev-wallpaper {
+    inset: 6px 2px 60px;
+}
+
+.fuel-meter.is-electric .ev-wallpaper img {
+    width: 185px;
+    height: 185px;
+    opacity: 0.13;
+    filter: saturate(0.95);
+}
+
+.fuel-meter.is-electric .ev-header {
+    min-height: 15px;
+    padding: 0 1px 4px;
+    color: #b9c9cf;
+    border-bottom-color: #263b45;
+}
+
+.fuel-meter.is-electric .ev-header span,
+.fuel-meter.is-electric .ev-header time {
+    font-size: 7px;
+}
+
+.fuel-meter.is-electric .ev-charge-summary {
+    gap: 6px;
+    min-height: 68px;
+    padding: 2px;
+}
+
+.fuel-meter.is-electric .ev-battery-value {
+    color: #f1f7f8;
+    font-size: 35px;
+}
+
+.fuel-meter.is-electric .ev-battery-track {
+    height: 7px;
+    background: #29383e;
+}
+
+.fuel-meter.is-electric .ev-status {
+    color: #9eb0b7;
+    font-size: 8px;
+}
+
+.fuel-meter.is-electric .ev-readings {
+    background: rgba(12, 26, 32, 0.86);
+    border-color: #29414b;
+}
+
+.fuel-meter.is-electric .ev-reading,
+.fuel-meter.is-electric .ev-reading:first-child,
+.fuel-meter.is-electric .ev-reading:last-child {
+    gap: 3px;
+    min-height: 38px;
+    padding: 4px;
+    border-right-color: #29414b;
+    border-bottom-color: #29414b;
+}
+
+.fuel-meter.is-electric .ev-reading-label {
+    color: #86a0aa;
+    font-size: 6.5px;
+}
+
+.fuel-meter.is-electric .ev-reading-value {
+    color: #edf5f6;
+    font-size: 11.5px;
+}
+
+.fuel-meter.is-electric .ev-footer {
+    padding-inline: 1px;
+    color: #89a0aa;
+    font-size: 7px;
+}
+
+.fuel-meter.is-electric .ev-action {
+    min-height: 24px;
+    padding: 3px 7px;
+    font-size: 8px;
+}
+
+.fuel-meter.is-electric .checkout-panel {
+    top: 27px;
+    right: 6px;
+    bottom: 6px;
+    left: 6px;
+    grid-template-rows: 17px 58px 58px minmax(72px, 1fr);
+    gap: 6px;
+    padding: 7px;
+    color: #e8f0f2;
+    background:
+        linear-gradient(rgba(9, 19, 24, 0.87), rgba(9, 19, 24, 0.87)),
+        url('logos/ui/electric_charger.png') center 43% / 185px no-repeat,
+        #091318;
+    border: 1px solid #29414b;
+    box-shadow: inset 0 0 18px rgba(21, 74, 91, 0.12);
+}
+
+.fuel-meter.is-electric .checkout-header,
+.fuel-meter.is-electric .checkout-footer {
+    border-color: #29414b;
+}
+
+.fuel-meter.is-electric .checkout-header h2 {
+    color: #e8f0f2;
+    font-size: 9px;
+}
+
+.fuel-meter.is-electric .checkout-cancel {
+    color: #a8bbc2;
+    border-color: #405963;
+}
+
+.fuel-meter.is-electric .checkout-group {
+    display: grid;
+    align-content: stretch;
+    gap: 0;
+}
+
+.fuel-meter.is-electric .checkout-option {
+    grid-template-rows: 18px auto auto;
+    justify-items: center;
+    gap: 2px;
+    min-height: 55px;
+    padding: 4px 5px;
+    color: #dce7ea;
+    text-align: center;
+    background: #15252c;
+    border-color: #3a515b;
+}
+
+.fuel-meter.is-electric .checkout-options > .checkout-option:only-child {
+	grid-column: 1 / -1;
+}
+
+.fuel-meter.is-electric .checkout-option-icon {
+    width: 18px;
+    height: 18px;
+    color: #6bd3ec;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+.fuel-meter.is-electric .checkout-option[data-group='payment'] .checkout-option-icon {
+    color: #a9bbc2;
+}
+
+.fuel-meter.is-electric .checkout-option.is-selected .checkout-option-icon {
+    color: #fff;
+}
+
+.fuel-meter.is-electric .checkout-option-name {
+    font-size: 12px;
+	line-height: 16px;
+    text-align: center;
+}
+
+.fuel-meter.is-electric .checkout-option-meta {
+    font-size: 8.5px;
+    text-align: center;
+}
+
+.fuel-meter.is-electric .checkout-option:hover,
+.fuel-meter.is-electric .checkout-option:focus-visible {
+    border-color: #37a66b;
+}
+
+.fuel-meter.is-electric .checkout-option.is-selected {
+    color: #fff;
+    background: #237c4b;
+    border-color: #43b879;
+}
+
+.fuel-meter.is-electric .checkout-option-meta,
+.fuel-meter.is-electric .checkout-summary {
+    color: #8fa3ab;
+}
+
+.fuel-meter.is-electric .checkout-footer {
+    gap: 4px;
+    padding-top: 5px;
+}
+
+.fuel-meter.is-electric .checkout-summary {
+    max-height: 18px;
+    font-size: 7px;
+    text-align: center;
+}
+
+.fuel-meter.is-electric .checkout-confirm {
+    height: 27px;
+    font-size: 8px;
+}
+
+.portable-terminal {
+	display: grid;
+	grid-template-columns: 62px minmax(0, 1fr);
+	grid-template-rows: 17px 34px 26px;
+	gap: 4px 7px;
+	min-width: 0;
+	padding: 6px 7px;
+	color: #c8d5d8;
+	background: #11191b;
+	border: 1px solid #3a494c;
+	box-shadow: inset 0 0 0 1px rgba(98, 196, 188, 0.04);
+	font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.portable-terminal[hidden] {
+	display: none;
+}
+
+.portable-header {
+	grid-column: 1 / -1;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	min-width: 0;
+	padding-bottom: 3px;
+	border-bottom: 1px solid #2b373a;
+}
+
+.portable-header span,
+.portable-header strong {
+	overflow: hidden;
+	font-size: 6.5px;
+	line-height: 1;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.portable-header span {
+	color: #839396;
+}
+
+.portable-header strong {
+	color: #62c4bc;
+}
+
+.portable-pack {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+}
+
+.portable-battery {
+	position: relative;
+	display: block;
+	width: 34px;
+	height: 15px;
+	padding: 2px;
+	border: 1px solid #677578;
+	border-radius: 2px;
+}
+
+.portable-battery::after {
+	position: absolute;
+	top: 4px;
+	right: -4px;
+	width: 2px;
+	height: 7px;
+	content: '';
+	background: #677578;
+	border-radius: 0 1px 1px 0;
+}
+
+.portable-pack-fill {
+	display: block;
+	width: 0;
+	height: 100%;
+	background: #62c4bc;
+	transition: width 160ms linear, background-color 160ms linear;
+}
+
+.portable-pack-copy {
+	display: grid;
+	gap: 1px;
+	min-width: 0;
+}
+
+.portable-pack-copy span {
+	color: #78888b;
+	font-size: 6px;
+}
+
+.portable-pack-copy strong {
+	color: #eef4f5;
+	font-size: 15px;
+	line-height: 16px;
+}
+
+.portable-facts {
+	grid-row: 2 / 4;
+	grid-column: 2;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	align-self: stretch;
+	min-width: 0;
+	background: #0b1113;
+	border: 1px solid #2c393c;
+}
+
+.portable-facts div {
+	display: grid;
+	align-content: center;
+	justify-items: center;
+	gap: 3px;
+	min-width: 0;
+	padding: 3px;
+	border-right: 1px solid #263235;
+}
+
+.portable-facts div:last-child {
+	border-right: 0;
+}
+
+.portable-facts span {
+	color: #6f8185;
+	font-size: 5.5px;
+	line-height: 1;
+}
+
+.portable-facts strong {
+	max-width: 100%;
+	overflow: hidden;
+	color: #dce6e8;
+	font-size: 8px;
+	line-height: 10px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fuel-meter.is-electric.is-portable-output,
+.fuel-meter.is-electric.is-portable-output.is-checkout {
+	width: min(198px, calc(100vw - 28px));
+	min-height: 0;
+	padding: 5px;
+	background: #090e10;
+	border-top-color: #4b9f99;
+	border-right-color: #344144;
+	border-bottom-color: #5f6c6e;
+	border-left-color: #344144;
+}
+
+body:not(.local-preview) .fuel-meter.is-electric.is-portable-output {
+	bottom: max(14px, 2.5vh);
+}
+
+.fuel-meter.is-portable-low .portable-header strong,
+.fuel-meter.is-portable-low .portable-pack-copy strong {
+	color: #e3aa48;
+}
+
+.fuel-meter.is-portable-low .portable-pack-fill {
+	background: #d89b37;
+}
+
+.fuel-meter.is-portable-critical {
+	border-top-color: #bb4545;
+	border-bottom-color: #7e3333;
+}
+
+.fuel-meter.is-portable-critical .portable-header strong,
+.fuel-meter.is-portable-critical .portable-pack-copy strong {
+	color: #ef6565;
+}
+
+.fuel-meter.is-portable-critical .portable-pack-fill {
+	background: #d64d4d;
+}
