@@ -21,14 +21,14 @@ This is not an official CommunityOx release. Keep the installed resource folder 
 - `ox_lib`
 - `ox_inventory`
 - `ox_target`
-- `san_andreas_sound`
+- [`san_andreas_sound` - San Andreas Sound Suite](https://drsnyder-fivem-site.pages.dev/scripts/san-andreas-sound-suite)
 - Included `ox_fuel_assets` companion resource
 
 ## Installation
 
 1. Install the included `ox_fuel` and `ox_fuel_assets` folders.
 2. Disable any other fuel resource.
-3. Copy the seven `.ogg` files from `ox_fuel/assets/sounds` to `san_andreas_sound/web/sounds`.
+3. [Download and install San Andreas Sound Suite](https://drsnyder-fivem-site.pages.dev/scripts/san-andreas-sound-suite), then copy the seven `.ogg` files from `ox_fuel/assets/sounds` to `san_andreas_sound/web/sounds`.
 4. Review prices, pump locations, EV models, vehicle profiles, and payment settings in `config.lua`.
 5. Add the portable charger item from `install/ox_inventory_items.lua` to `ox_inventory/data/items.lua`.
 6. Copy `install/images/portable_ev_charger_compact.png` to `ox_inventory/web/images`.
