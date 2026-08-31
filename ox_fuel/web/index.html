@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fuel meter</title>
-    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
     <main id="fuel-meter" class="fuel-meter" aria-hidden="true">
@@ -60,19 +60,17 @@
 			</header>
 
 			<div class="portable-pack">
-				<span class="portable-battery" aria-hidden="true">
+				<span class="portable-pack-label">PACK</span>
+				<span id="portable-battery" class="portable-battery" role="img" aria-label="Pack level unavailable">
 					<span id="portable-pack-fill" class="portable-pack-fill"></span>
+					<strong id="portable-pack-value" class="portable-pack-value">--%</strong>
 				</span>
-				<div class="portable-pack-copy">
-					<span>PACK</span>
-					<strong id="portable-pack-value">--%</strong>
-				</div>
 			</div>
 
 			<div class="portable-facts">
-				<div><span>EV</span><strong id="portable-vehicle-value">--%</strong></div>
-				<div><span>OUT kWh</span><strong id="portable-energy-value">0.00</strong></div>
-				<div><span>TIME</span><strong id="portable-time-value">--</strong></div>
+				<div><span>VEHICLE</span><strong id="portable-vehicle-value">--%</strong></div>
+				<div><span>DELIVERED</span><strong id="portable-energy-value">0.00 kWh</strong></div>
+				<div><span>TIME LEFT</span><strong id="portable-time-value">--</strong></div>
 			</div>
 		</section>
 
@@ -145,7 +143,7 @@
     </main>
 
     <script src="app.js?v=9"></script>
-    <script src="ev.js?v=12"></script>
+    <script src="ev.js?v=13"></script>
     <script src="checkout.js?v=10"></script>
 </body>
 </html>

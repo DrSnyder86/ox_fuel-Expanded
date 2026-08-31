@@ -2,8 +2,15 @@ if not lib.checkDependency('ox_lib', '3.22.0', true) then return end
 if not lib.checkDependency('ox_inventory', '2.30.0', true) then return end
 
 return {
-	-- Get notified when a new version releases
-	versionCheck = true,
+	-- Check the maintained GitHub package once when the server starts.
+	versionCheck = {
+		enabled = true,
+		manifestUrl = 'https://raw.githubusercontent.com/DrSnyder86/ox_fuel-Expanded/main/ox_fuel/fxmanifest.lua',
+		downloadUrl = 'https://github.com/DrSnyder86/ox_fuel-Expanded',
+		notifyCurrent = false,
+		verboseErrors = false,
+		delayMs = 1500,
+	},
 
 	-- Enable support for ox_target
 	ox_target = true,
@@ -66,9 +73,14 @@ return {
 		sessionGraceMs = 10000,
 	},
 
-	-- Prevent multiple players from using the same physical pump
+	-- Synchronize each physical pump handle. All models are dual-nozzle except configured exclusions.
 	pumpOccupancy = {
 		enabled = true,
+		dualNozzles = true,
+		sharedFlowMultiplier = 0.65,
+		singleNozzleModels = {
+			[`prop_vintage_pump`] = true,
+		},
 		coordinatePrecision = 10,
 		maxAcquireDistance = 4.0,
 		leaseDurationMs = 15000,
@@ -221,6 +233,13 @@ return {
 			[`prop_gas_pump_old2`] = { x = 0.0, y = 0.0, z = 0.0 },
 			[`prop_gas_pump_old3`] = { x = 0.0, y = 0.0, z = 0.0 },
 		},
+		-- Optional per-handle corrections applied after the automatic left/right anchor.
+		pumpSlotOffsets = {
+			-- [`prop_gas_pump_1a`] = {
+			-- 	[1] = { x = 0.0, y = 0.0, z = 0.0 },
+			-- 	[2] = { x = 0.0, y = 0.0, z = 0.0 },
+			-- },
+		},
 		pumpHeights = {
 			[`prop_gas_pump_1a`] = 1.35, -- RON
 			[`prop_gas_pump_1b`] = 1.35, -- GLOBE OIL
@@ -312,6 +331,10 @@ return {
 		-- Final correction added to every resolved electric connector rotation.
 		vehicleAttachRotation = { x = 0.0, y = 45.0, z = 180.0 },
 		chargerCableOffset = { x = 0.0, y = 0.0, z = 1.76 },
+		chargerCableSlotOffsets = {
+			[1] = { x = -0.18, y = 0.0, z = 0.0 },
+			[2] = { x = 0.18, y = 0.0, z = 0.0 },
+		},
 		connectorCableOffset = { x = -0.005, y = 0.185, z = -0.05 },
 		handOffset = { x = 0.24, y = 0.10, z = -0.052 },
 		handRotation = { x = -45.0, y = 120.0, z = 75.0 },
@@ -354,8 +377,8 @@ return {
 			cableLength = 2.0,
 			cableMaxLength = 5.0,
 			cableSlack = 0.30,
-			-- Rope origin on the lower front connector panel of prop_torture_01.
-			cableOffset = { x = -0.18, y = -0.30, z = 0.16 },
+			-- Rope origin centered on the lower front connector panel of prop_torture_01.
+			cableOffset = { x = 0.0, y = -0.30, z = 0.16 },
 			carryOffset = { x = 0.12, y = 0.02, z = -0.02 },
 			carryRotation = { x = -85.0, y = 15.0, z = 15.0 },
 			interface = {

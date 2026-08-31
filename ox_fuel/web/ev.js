@@ -3,6 +3,7 @@
     const terminal = document.getElementById('ev-terminal');
 	const portableTerminal = document.getElementById('portable-terminal');
 	const portableStatus = document.getElementById('portable-status');
+	const portableBattery = document.getElementById('portable-battery');
 	const portablePackFill = document.getElementById('portable-pack-fill');
 	const portablePackValue = document.getElementById('portable-pack-value');
 	const portableVehicleValue = document.getElementById('portable-vehicle-value');
@@ -163,10 +164,11 @@
 			else if (warning.low) portableStatusText = data.portableLowLabel || 'LOW PACK';
 
 			portableStatus.textContent = portableStatusText;
-			portablePackFill.style.width = `${packPercent}%`;
+			portablePackFill.style.height = `${packPercent}%`;
 			portablePackValue.textContent = `${packPercent.toFixed(0)}%`;
+			portableBattery.setAttribute('aria-label', `Portable pack level ${packPercent.toFixed(0)} percent`);
 			portableVehicleValue.textContent = hasPercent ? `${percent.toFixed(0)}%` : '--%';
-			portableEnergyValue.textContent = energy.toFixed(2);
+			portableEnergyValue.textContent = `${energy.toFixed(2)} kWh`;
 			portableTimeValue.textContent = formatRemaining(data.remainingSeconds, state);
 			portableTerminal.dataset.state = state;
 			return;

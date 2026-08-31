@@ -15,7 +15,8 @@ Maintained source and downloads: [DrSnyder86/ox_fuel-Expanded](https://github.co
 - Modern and vintage pump interfaces with RON, LTD, XERO, and Globe Oil branding.
 - Dedicated EV charging interface with Standard and Rapid charging.
 - Purchasable, deployable, damageable, and rechargeable portable EV power unit.
-- Synchronized pump occupancy, spawned custom pumps, scripted pump explosions, and electrical charger faults.
+- Two synchronized nozzle slots on every gas pump and EV charger except the single-handle vintage pump.
+- Shared-pump flow slowdown, spawned custom pumps, scripted pump explosions, and electrical charger faults.
 - Optional Chaos Mode with server-side chance rolls and economy-safe interrupted settlement.
 - Configurable startup version check against the maintained GitHub package.
 
@@ -57,7 +58,7 @@ The main settings are grouped in `config.lua`:
 | `versionCheck` | GitHub manifest URL, download URL, startup delay, and console notices |
 | `fueling` | Grades, prices, flow speed, and price precision |
 | `payments` | Cash/bank options and defaults |
-| `pumpOccupancy` | Pump leases and heartbeat timing |
+| `pumpOccupancy` | Dual-nozzle slots, single-model exclusions, shared flow speed, leases, and heartbeat timing |
 | `fuelMeter` | Units, checkout method, logos, themes, and UI behavior |
 | `nozzle` | Fuel nozzle, hose, sounds, attachment, anchors, and debug tools |
 | `electric` | EV models, stations, charging modes, connector, cable, and blips |
@@ -67,6 +68,8 @@ The main settings are grouped in `config.lua`:
 | `chaosMode` | Optional running-engine, drive-off, old-pump, and charging faults |
 
 Fuel remains stored as a `0` to `100` vehicle state value for ox_fuel compatibility. Gallons, kWh, price, premium blend, and portable pack charge are calculated and validated by the server.
+
+Each pump normally exposes two independently synchronized handles. `prop_vintage_pump` remains single-handle through `pumpOccupancy.singleNozzleModels`. When both slots are actively transferring fuel or energy, both sessions use `pumpOccupancy.sharedFlowMultiplier`; holding an unused nozzle does not reduce the other side's speed.
 
 The version checker runs once at server startup and prints only when a newer package is available unless `notifyCurrent` or `verboseErrors` is enabled. Set `versionCheck.enabled = false` to disable it. Each public update must also bump `version` in `ox_fuel/fxmanifest.lua` on GitHub.
 
@@ -120,19 +123,19 @@ Compared with CommunityOx ox_fuel v1.5.2, this build adds:
 
 - Physical nozzle, hose, connector, and cable systems.
 - Positional fuel and charging sounds through `san_andreas_sound`.
-- Live branded gas and EV interfaces with in-UI product and payment selection.
-- Synchronized pump/charger occupancy and server-authoritative transactions.
+- Bottom-right branded gas and EV interfaces with in-UI product and payment selection.
+- Dual-slot pump/charger occupancy, shared-use flow reduction, and server-authoritative transactions.
 - Vehicle tank capacities, EV batteries, fuel grades, premium blending, and payment adapters.
 - Automatic and profile-based vehicle attachment with live offset editors.
 - Spawned custom pumps and EV stations with synchronized damage behavior.
-- Portable EV power, item metadata, purchase, deployment, charging, damage, and recharge flows.
+- Portable EV power with a compact vertical battery display, item metadata, purchase, deployment, charging, damage, and recharge flows.
 - Persistent electric assets through the `ox_fuel_assets` companion.
 - Optional, disabled-by-default Chaos Mode.
 - Maintained-repository startup version checking.
 
 ## Testing Notes
 
-Before using the resource on a live server, test representative gas vehicles, EVs, addon vehicles, framework payment accounts, custom pumps, resource restart, portable item metadata, and every enabled Chaos Mode outcome.
+Before using the resource on a live server, test representative gas vehicles, EVs, addon vehicles, both sides of ordinary pumps and chargers, the single-slot vintage pump, shared flow transitions, framework payment accounts, custom pumps, resource restart, portable item metadata, and every enabled Chaos Mode outcome.
 
 ## Licensing and Credits
 
