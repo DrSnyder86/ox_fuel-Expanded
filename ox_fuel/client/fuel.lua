@@ -11,6 +11,16 @@ local fuelingRun = 0
 local fuelingSettings = config.fueling or {}
 local meterSettings = config.fuelMeter or {}
 local activeCanTransaction
+local activePumpFlows = {}
+
+RegisterNetEvent('ox_fuel:pumpFlowChanged', function(payload)
+	if type(payload) ~= 'table' or payload.sessionType ~= 'fuel' or type(payload.sessionId) ~= 'string' then return end
+
+	activePumpFlows[payload.sessionId] = {
+		amountPerTick = math.max(tonumber(payload.amountPerTick) or 0, 0),
+		multiplier = math.clamp(tonumber(payload.multiplier) or 1, 0.1, 1),
+	}
+end)
 
 local function roundPrice(value)
 	value = math.max(tonumber(value) or 0, 0)
@@ -149,7 +159,7 @@ function fuel.getPetrolCan(pump, refuel)
 
 	if not coords then return end
 
-	meter.setPump(pumpEntity)
+	meter.setPump(pumpEntity, pumpEntity and nozzle and nozzle.getPreferredPumpSlot(pumpEntity))
 	meter.show(meter.readyPayload(checkout.getDefault()))
 
 	local selection = checkout.select(nil, locale(refuel and 'fuelcan_refill_options' or 'fuelcan_buy_options'), true)
@@ -161,7 +171,12 @@ function fuel.getPetrolCan(pump, refuel)
 	end
 
 	local pumpModel = pumpEntity and GetEntityModel(pumpEntity) or nil
-	local pumpPayload = pumpEntity and { x = coords.x, y = coords.y, z = coords.z } or nil
+	local pumpPayload = pumpEntity and {
+		x = coords.x,
+		y = coords.y,
+		z = coords.z,
+		slot = nozzle and nozzle.getPreferredPumpSlot(pumpEntity) or nil,
+	} or nil
 
 	TaskTurnPedToFaceCoord(cache.ped, coords.x, coords.y, coords.z, config.petrolCan.duration)
 	Wait(500)
@@ -184,6 +199,7 @@ function fuel.getPetrolCan(pump, refuel)
 
 	state.isFueling = true
 	activeCanTransaction = transaction.id
+	if pumpEntity then meter.setPump(pumpEntity, transaction.pumpSlot) end
 
 	local startedAt = GetGameTimer()
 	local liveLabel = locale(refuel and 'fuel_meter_can_refilling' or 'fuel_meter_can_buying')
@@ -302,6 +318,7 @@ function fuel.startFueling(vehicle, isPump)
 	Wait(500)
 
 	local nozzleAttached = false
+	local nozzleSoundSession
 
 	if usesNozzle then
 		if not nozzle.startFueling(vehicle) then
@@ -311,6 +328,7 @@ function fuel.startFueling(vehicle, isPump)
 		end
 
 		nozzleAttached = nozzle.isAttachedToVehicle(vehicle)
+		nozzleSoundSession = nozzle.getSoundSession and nozzle.getSoundSession()
 	end
 
 	local session = lib.callback.await(
@@ -350,6 +368,10 @@ function fuel.startFueling(vehicle, isPump)
 	local transferredVolume = 0
 	local vintageQuirk = session.chaosVintageQuirk
 	local vintageQuirkTriggered = false
+	activePumpFlows[session.id] = activePumpFlows[session.id] or {
+		amountPerTick = volumePerTick,
+		multiplier = math.clamp(tonumber(session.flowMultiplier) or 1, 0.1, 1),
+	}
 
 	selection = {
 		gradeId = session.gradeId,
@@ -399,7 +421,9 @@ function fuel.startFueling(vehicle, isPump)
 		end
 
 		local nextTicks = completedTicks + 1
-		local nextVolume = math.min(nextTicks * volumePerTick, maxVolume)
+		local activeFlow = activePumpFlows[session.id]
+		local tickVolume = activeFlow and activeFlow.amountPerTick or volumePerTick
+		local nextVolume = math.min(transferredVolume + tickVolume, maxVolume)
 		local nextPrice = isPump and roundPrice(nextVolume * pricePerGallon) or 0
 
 		if isPump then
@@ -493,10 +517,12 @@ function fuel.startFueling(vehicle, isPump)
 	end
 
 	local result = lib.callback.await('ox_fuel:finishFueling', false, session.id, completedTicks)
+	activePumpFlows[session.id] = nil
 	local finalFuel = result and result.fuel or initialFuel
 	local finalPrice = result and result.price or 0
 	local finalCanAmount = result and result.durability or initialCanAmount
 	local completed = result and completedNaturally and not canceledByPlayer
+	if completed and usesNozzle and nozzle.completeFueling then nozzle.completeFueling(nozzleSoundSession) end
 
 	if result then
 		selection.gradeLabel = result.gradeLabel or selection.gradeLabel

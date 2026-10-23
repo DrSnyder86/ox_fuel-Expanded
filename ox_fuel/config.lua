@@ -160,7 +160,8 @@ return {
 		currency = '$',
 		unit = 'gallons', -- 'gallons' or 'liters'
 		pumpDisplays = {
-			[`electric_charger`] = { theme = 'modern', variant = 'charge-modern', brand = 'SENTINEL EV CHARGING', logo = 'electric_charger', accent = '#19b9ff' },
+			[`drs_gas_pump_ron`] = { theme = 'modern', variant = 'ron-modern', brand = 'RON', logo = 'prop_gas_pump_1a', accent = '#ef8b32' },
+			[`drs_ev_station`] = { theme = 'modern', variant = 'charge-modern', brand = 'SENTINEL EV CHARGING', logo = 'electric_charger', accent = '#19b9ff' },
 			[`prop_gas_pump_old2`] = { theme = 'vintage', variant = 'xero-vintage', brand = 'XERO', logo = 'prop_gas_pump_old2', accent = '#47c4c7' },
 			[`prop_gas_pump_1a`] = { theme = 'modern', variant = 'ron-modern', brand = 'RON', logo = 'prop_gas_pump_1a', accent = '#ef8b32' },
 			[`prop_vintage_pump`] = { theme = 'vintage', variant = 'globe-vintage', brand = 'GLOBE OIL', logo = 'prop_vintage_pump', accent = '#d9584f' },
@@ -174,7 +175,7 @@ return {
 	-- Physical pump nozzle, hose, and San Andreas Sound positional audio
 	nozzle = {
 		enabled = true,
-		model = `prop_cs_fuel_nozle`,
+		model = `drs_fuel_nozzle`, -- Shared by every fuel pump; stock-compatible mount frame.
 		hose = true,
 		hoseLength = 5.0,
 		hoseSlack = 0.45,
@@ -250,18 +251,97 @@ return {
 			[`prop_vintage_pump`] = 1.10, -- GLOBE OIL
 		},
 		sounds = {
-			pickup = { name = 'pickupnozzle', volume = 0.4, source = 'pump', maxDistance = 12.0 },
-			putback = { name = 'putbacknozzle', volume = 0.4, source = 'pump', maxDistance = 12.0 },
-			refuel = { name = 'refuel', volume = 0.3, source = 'nozzle', maxDistance = 18.0, loop = true, managed = true },
-			stop = { name = 'fuelstop', volume = 0.4, source = 'nozzle', maxDistance = 14.0 },
+			pickup = { name = 'drs_holder_release', volume = 0.28, source = 'holder', maxDistance = 3.5 },
+			putback = { name = 'drs_holder_dock', volume = 0.34, source = 'holder', maxDistance = 4.0 },
+			start = { name = 'drs_equipment_relay', volume = 0.20, source = 'pump', maxDistance = 4.0 },
+			pumpStop = { name = 'drs_equipment_relay', volume = 0.15, source = 'pump', maxDistance = 4.0 },
+			connect = { name = 'drs_fuel_contact', volume = 0.22, source = 'nozzle', maxDistance = 3.0 },
+			disconnect = { name = 'drs_fuel_contact', volume = 0.20, source = 'nozzle', maxDistance = 3.0 },
+			refuel = { name = 'drs_gas_loop', volume = 0.24, source = 'nozzle', maxDistance = 18.0, loop = true, managed = true },
+			stop = { name = 'drs_fuel_shutoff', volume = 0.34, source = 'nozzle', maxDistance = 4.0 },
+			complete = false, -- The shutoff click already signals completion; no extra chime/click.
 		},
+		localResourceSounds = true,
 	},
 
-	-- Electric charging uses CDN-Fuel's GPL-3.0 charger/connector assets and LC Fuel's station coordinates.
+	-- Original illuminated RON replacement; other pump models/offsets remain unchanged.
+	ronPump = {
+		enabled = true, originalModel = `prop_gas_pump_1a`, model = `drs_gas_pump_ron`,
+		spawnDistance = 140.0, despawnDistance = 180.0, maxNearby = 12, modelLodDistance = 180,
+		headingOffset = 0.0, zOffset = 0.0, hideRadius = 0.10,
+		damageable = true, reportDistance = 50.0,
+		damageLocations = {}, -- Optional vec3 entries for RON pumps in unlisted MLO stations.
+		stationDisplay = {
+			enabled = true, model = `drs_gas_pump_ron`, mode = 'pump', hudFallback = false,
+			useApproachSide = true, -- Either nozzle uses the register facing the player at pickup.
+			renderDistance = 12.0, inputDistance = 3.5, textureWidth = 512, textureHeight = 384, minimumScreenPixels = 100,
+			screens = {
+				[1] = { x = 0.0, y = -0.2085, z = 1.23, width = 0.46, height = 0.345 },
+				[2] = { x = 0.0, y = 0.2085, z = 1.23, width = 0.46, height = 0.345, back = true },
+			},
+		},
+		docking = {
+			enabled = true, model = `drs_gas_pump_ron`, renderDistance = 30.0, maxSources = 8,
+			slots = {
+				[1] = { offset = { x = -0.50, y = -0.035, z = 0.98 }, rotation = { x = 0.0, y = 0.0, z = -90.0 }, anchor = { x = -0.415, y = 0.0, z = 1.44 }, cableModel = `drs_ron_hose_l` },
+				[2] = { offset = { x = 0.50, y = 0.035, z = 0.98 }, rotation = { x = 0.0, y = 0.0, z = 90.0 }, anchor = { x = 0.415, y = 0.0, z = 1.44 }, cableModel = `drs_ron_hose_r` },
+			},
+		},
+		lighting = {
+			enabled = false, -- RON now uses model-native night diffusers and an embedded light.
+			model = `drs_gas_pump_ron`, nightOnly = true, renderDistance = 16.0,
+			lights = {
+				{ offset = { x = 0.0, y = -0.29, z = 1.59 }, span = { x = 0.62 }, samples = 3, colour = { r = 255, g = 175, b = 85 }, range = 0.42, intensity = 1.0 },
+				{ offset = { x = 0.0, y = 0.29, z = 1.59 }, span = { x = 0.62 }, samples = 3, colour = { r = 255, g = 175, b = 85 }, range = 0.42, intensity = 1.0 },
+				{ offset = { x = 0.0, y = -0.265, z = 0.10 }, span = { x = 0.60 }, samples = 3, colour = { r = 255, g = 154, b = 48 }, range = 0.40, intensity = 0.65 },
+				{ offset = { x = 0.0, y = 0.265, z = 0.10 }, span = { x = 0.60 }, samples = 3, colour = { r = 255, g = 154, b = 48 }, range = 0.40, intensity = 0.65 },
+			},
+		},
+	},
+	-- Original DRS Sentinel hardware/audio; station coordinates adapted from LC Fuel.
 	electric = {
 		enabled = true,
-		chargerModel = `electric_charger`,
-		connectorModel = `electric_nozzle`,
+		chargerModel = `drs_ev_station`,
+		modelLodDistance = 180, -- Cabinet geometry only; DUI and light ranges stay close.
+		stationDisplay = {
+			enabled = true,
+			hudFallback = false, -- Sentinel uses the cabinet screens only; gas/portable keep their HUD.
+			model = `drs_ev_station`,
+			renderDistance = 14.0,
+			inputDistance = 3.0,
+			minimumScreenPixels = 130, -- Readability threshold if hudFallback is enabled explicitly.
+			maxStations = 2,
+			textureWidth = 512,
+			textureHeight = 640,
+			screens = {
+				[1] = { x = -0.18, y = -0.325, z = 1.34, width = 0.30, height = 0.375 },
+				[2] = { x = 0.18, y = -0.325, z = 1.34, width = 0.30, height = 0.375 },
+			},
+		},
+		connectorModel = `drs_ev_connector`,
+		docking = {
+			enabled = true,
+			model = `drs_ev_station`,
+			renderDistance = 30.0,
+			maxSources = 4,
+			slots = {
+				[1] = { offset = { x = -0.473, y = -0.067, z = 1.27 }, rotation = { x = 0.0, y = 0.0, z = 90.0 }, cableModel = `drs_ev_cable_l` },
+				[2] = { offset = { x = 0.473, y = -0.067, z = 1.27 }, rotation = { x = 0.0, y = 0.0, z = -90.0 }, cableModel = `drs_ev_cable_r` },
+			},
+		},
+		stationLighting = {
+			enabled = true,
+			model = `drs_ev_station`,
+			nightOnly = true,
+			renderDistance = 16.0,
+			maxSources = 2, -- Shared nearest-cabinet limit, at most 12 light samples per cabinet.
+			lights = {
+				{ offset = { x = 0.0, y = -0.31, z = 1.91 }, span = { x = 0.54 }, samples = 3, colour = { r = 36, g = 190, b = 213 }, range = 0.38, intensity = 1.10 },
+				{ offset = { x = 0.0, y = -0.33, z = 0.44 }, span = { x = 0.54 }, samples = 3, colour = { r = 185, g = 44, b = 102 }, range = 0.32, intensity = 0.75 },
+				{ offset = { x = -0.18, y = -0.32, z = 1.035 }, colour = { r = 36, g = 190, b = 213 }, range = 0.22, intensity = 0.55 },
+				{ offset = { x = 0.18, y = -0.32, z = 1.035 }, colour = { r = 36, g = 190, b = 213 }, range = 0.22, intensity = 0.55 },
+			},
+		},
 		headingOffset = 180.0,
 		showBlips = 1, -- 0 = hidden, 1 = nearby, 2 = all
 		blip = {
@@ -330,25 +410,40 @@ return {
 		rightSideRotationZ = 180.0,
 		-- Final correction added to every resolved electric connector rotation.
 		vehicleAttachRotation = { x = 0.0, y = 45.0, z = 180.0 },
-		chargerCableOffset = { x = 0.0, y = 0.0, z = 1.76 },
+		chargerCableOffset = { x = 0.0, y = -0.035, z = 1.10 },
 		chargerCableSlotOffsets = {
-			[1] = { x = -0.18, y = 0.0, z = 0.0 },
-			[2] = { x = 0.18, y = 0.0, z = 0.0 },
+			[1] = { x = -0.46, y = 0.0, z = 0.0 },
+			[2] = { x = 0.46, y = 0.0, z = 0.0 },
 		},
 		connectorCableOffset = { x = -0.005, y = 0.185, z = -0.05 },
 		handOffset = { x = 0.24, y = 0.10, z = -0.052 },
 		handRotation = { x = -45.0, y = 120.0, z = 75.0 },
 		soundProvider = 'san_andreas_sound',
-		soundBaseUrl = 'https://cfx-nui-san_andreas_sound/web/sounds/%s.ogg',
+		localResourceSounds = true, -- Original EV clips are served directly by ox_fuel.
 		soundMaxDistance = 18.0,
 		soundAcousticClass = 'World',
-			sounds = {
-				chargePickup = { name = 'pickupnozzle', volume = 0.4, source = 'charger', maxDistance = 12.0 },
-				chargePutback = { name = 'putbackcharger', volume = 0.4, source = 'charger', maxDistance = 12.0 },
-				chargeLoop = { name = 'charging', volume = 0.3, source = 'connector', maxDistance = 18.0, loop = true, managed = true },
-				chargeStop = { name = 'chargestop', volume = 0.4, source = 'connector', maxDistance = 14.0 },
-				chargeFault = { name = 'chargestop', volume = 0.65, source = 'charger', maxDistance = 20.0 },
-			},
+		sounds = {
+			chargePickup = { name = 'drs_holder_release', volume = 0.26, source = 'holder', maxDistance = 3.5 },
+			chargePutback = { name = 'drs_holder_dock', volume = 0.26, source = 'holder', maxDistance = 4.0 },
+			chargeConnect = { name = 'drs_ev_lock', volume = 0.32, source = 'connector', maxDistance = 3.0 },
+			chargeDisconnect = { name = 'drs_ev_unlock', volume = 0.28, source = 'connector', maxDistance = 3.0 },
+			chargeStart = { name = 'drs_equipment_relay', volume = 0.30, source = 'charger', maxDistance = 4.0 },
+			chargeLoop = { name = 'drs_ev_loop', volume = 0.30, source = 'charger', maxDistance = 12.0, loop = true, managed = true },
+			chargeStop = { name = 'drs_equipment_relay', volume = 0.24, source = 'charger', maxDistance = 4.0 },
+			chargeComplete = { name = 'drs_device_ready', volume = 0.24, source = 'charger', maxDistance = 6.0 },
+			chargeFault = { name = 'drs_device_alert', volume = 0.34, source = 'charger', maxDistance = 8.0 },
+			portableChargePickup = { name = 'drs_holder_release', volume = 0.20, source = 'holder', maxDistance = 2.5 },
+			portableChargePutback = { name = 'drs_holder_dock', volume = 0.20, source = 'holder', maxDistance = 3.0 },
+			portableChargeConnect = { name = 'drs_ev_lock', volume = 0.26, source = 'connector', maxDistance = 3.0 },
+			portableChargeDisconnect = { name = 'drs_ev_unlock', volume = 0.23, source = 'connector', maxDistance = 3.0 },
+			portableChargeStart = { name = 'drs_equipment_relay', volume = 0.18, source = 'charger', maxDistance = 3.0 },
+			portableChargeLoop = { name = 'drs_pack_loop', volume = 0.25, source = 'charger', maxDistance = 7.0, loop = true, managed = true },
+			portableChargeStop = { name = 'drs_equipment_relay', volume = 0.15, source = 'charger', maxDistance = 3.0 },
+			portableChargeComplete = { name = 'drs_device_ready', volume = 0.18, source = 'charger', maxDistance = 4.0 },
+			portableChargeFault = { name = 'drs_device_alert', volume = 0.28, source = 'charger', maxDistance = 6.0 },
+			portableDeploy = { name = 'drs_pack_setdown', volume = 0.32, source = 'charger', maxDistance = 3.5 },
+			portableLift = { name = 'drs_holder_release', volume = 0.16, source = 'charger', maxDistance = 2.5 },
+		},
 		defaultMode = 'standard',
 		modeOrder = { 'standard', 'rapid' },
 		modes = {
@@ -366,8 +461,14 @@ return {
 			purchaseEnabled = true,
 			purchasePrice = 2500.0,
 			purchaseDuration = 4500,
-			groundModel = `prop_torture_01`,
-			carryModel = `prop_car_battery_01`, -- `prop_battery_02` is a smaller alternative
+			groundModel = `drs_ev_pack`,
+			carryModel = `drs_ev_pack_carry`,
+			docking = {
+				enabled = true,
+				offset = { x = 0.13, y = -0.142, z = 0.14 },
+				rotation = { x = 0.0, y = 0.0, z = 180.0 },
+				cableModel = `drs_ev_pack_cable`,
+			},
 			deployDistance = 1.05,
 			deployHeadingOffset = 0.0,
 			targetRadius = 0.85,
@@ -377,8 +478,7 @@ return {
 			cableLength = 2.0,
 			cableMaxLength = 5.0,
 			cableSlack = 0.30,
-			-- Rope origin centered on the lower front connector panel of prop_torture_01.
-			cableOffset = { x = 0.0, y = -0.30, z = 0.16 },
+			cableOffset = { x = -0.13, y = -0.141, z = 0.12 },
 			carryOffset = { x = 0.12, y = 0.02, z = -0.02 },
 			carryRotation = { x = -85.0, y = 15.0, z = 15.0 },
 			interface = {
@@ -404,7 +504,7 @@ return {
 				vehicleImpactHeight = 1.5,
 				vehicleImpactSpeed = 4.0,
 				vehicleApproachDot = 0.5,
-				effectOffset = { x = 0.0, y = 0.0, z = -0.72 },
+				effectOffset = { x = 0.0, y = 0.0, z = -0.98 },
 			},
 		},
 		defaultBatteryCapacityKwh = 75.0,
@@ -564,6 +664,7 @@ return {
 
 	-- Gas pump models. Every custom pump prop must also be listed here.
 	pumpModels = {
+		`drs_gas_pump_ron`, -- Original RON style-A replacement
 		`prop_gas_pump_old2`, -- XERO
 		`prop_gas_pump_1a`, -- RON
 		`prop_vintage_pump`, -- GLOBE OIL

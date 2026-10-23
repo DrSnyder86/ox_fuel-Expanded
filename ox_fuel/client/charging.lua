@@ -6,6 +6,8 @@ local checkout = require 'client.checkout'
 local chargers = require 'client.chargers'
 local propImpacts = require 'client.prop_impacts'
 local electricProfiles = require 'electric_profiles'
+local pumpSlots = require 'pump_slots'
+local hardware = require 'client.charger_hardware'
 
 local settings = config.electric or {}
 local portableSettings = settings.portable or {}
@@ -32,10 +34,28 @@ local occupiedChargers = {}
 local soundCounter = 0
 local activeSounds = {}
 local sourceType
+local sourceDockSlot
+local connectorGeneration = 0
 local portablePack
 local portableRechargeActive = false
 local portableRechargeSessionId
 local portablePurchaseSessionId
+local activePumpFlows = {}
+local occupancyRevision = 0
+local occupancyChanges = {}
+local snapshotPending = true
+
+RegisterNetEvent('ox_fuel:pumpFlowChanged', function(payload)
+	if type(payload) ~= 'table'
+		or (payload.sessionType ~= 'charge' and payload.sessionType ~= 'portable-recharge')
+		or type(payload.sessionId) ~= 'string'
+	then return end
+
+	activePumpFlows[payload.sessionId] = {
+		amountPerTick = math.max(tonumber(payload.amountPerTick) or 0, 0),
+		multiplier = math.clamp(tonumber(payload.multiplier) or 1, 0.1, 1),
+	}
+end)
 
 local portableTargetNames = {
 	'ox_fuel:portableTakeConnector',
@@ -76,17 +96,31 @@ local function getChargerIdentity(charger)
 	return key, model, { x = coords.x, y = coords.y, z = coords.z }
 end
 
-local function acquireChargerLease(charger)
+local function getPreferredChargerSlot(charger)
+	if not charger or not DoesEntityExist(charger) then return 1 end
+
+	local playerCoords = GetEntityCoords(cache.ped)
+	local playerOffset = GetOffsetFromEntityGivenWorldCoords(charger, playerCoords.x, playerCoords.y, playerCoords.z)
+
+	return pumpSlots.getPreferredSlot(playerOffset.x)
+end
+
+local function acquireChargerLease(charger, requestedSlot)
 	if occupancySettings.enabled == false then return true end
 
 	local key, model, position = getChargerIdentity(charger)
 
 	if not key then return false end
+	position.slot = (requestedSlot == 1 or requestedSlot == 2) and requestedSlot or getPreferredChargerSlot(charger)
 
 	local lease = lib.callback.await('ox_fuel:acquirePump', false, model, position)
 
 	if not lease then return false end
 	if lease.disabled then return true end
+	if (requestedSlot == 1 or requestedSlot == 2) and lease.slot ~= requestedSlot then
+		TriggerServerEvent('ox_fuel:releasePump', lease.key, lease.token)
+		return false
+	end
 
 	pumpLease = lease
 	occupiedChargers[lease.key] = lease.owner or GetPlayerServerId(PlayerId())
@@ -104,10 +138,13 @@ local function releaseChargerLease()
 	TriggerServerEvent('ox_fuel:releasePump', lease.key, lease.token)
 end
 
-RegisterNetEvent('ox_fuel:pumpOccupancyChanged', function(key, owner)
+RegisterNetEvent('ox_fuel:pumpOccupancyChanged', function(key, owner, connectorTaken)
 	if type(key) ~= 'string' then return end
 
 	occupiedChargers[key] = owner or nil
+	occupancyRevision = occupancyRevision + 1
+	if snapshotPending then occupancyChanges[key] = { revision = occupancyRevision, owner = owner or false, taken = connectorTaken == true } end
+	hardware.setOccupancy(key, owner, connectorTaken)
 end)
 
 CreateThread(function()
@@ -115,11 +152,22 @@ CreateThread(function()
 
 	Wait(500)
 
-	local snapshot = lib.callback.await('ox_fuel:getPumpOccupancy', false)
+	local revision = occupancyRevision
+	local snapshot, connectors = lib.callback.await('ox_fuel:getPumpOccupancy', false)
 
 	if type(snapshot) == 'table' then
+		connectors = type(connectors) == 'table' and connectors or {}
+		for key, change in pairs(occupancyChanges) do
+			if change.revision > revision then
+				snapshot[key] = change.owner or nil
+				connectors[key] = change.taken or nil
+			end
+		end
 		occupiedChargers = snapshot
+		hardware.setSnapshot(snapshot, connectors)
 	end
+	snapshotPending = false
+	occupancyChanges = {}
 end)
 
 local function soundProviderAvailable()
@@ -160,10 +208,17 @@ end
 local function soundPayload(sound, options)
 	options = options or {}
 
-	local entity = options.entity or (sound.source == 'charger' and sourceCharger or connectorObject)
+	local atCharger = sound.source == 'charger' or sound.source == 'holder'
+	local entity = options.entity or (atCharger and sourceCharger or connectorObject)
 	local coords = options.position
 
-	if not coords and sound.source == 'charger' and not options.entity and cableChargerPosition then
+	if not coords and sound.source == 'holder' and entity and DoesEntityExist(entity) then
+		local docking = sourceType == 'portable' and portableSettings.docking or settings.docking
+		local dock = docking and docking.slots and docking.slots[sourceDockSlot or 1] or docking
+		local offset = dock and dock.offset
+		if offset then coords = GetOffsetFromEntityInWorldCoords(entity, offset.x or 0.0, offset.y or 0.0, offset.z or 0.0) end
+	end
+	if not coords and atCharger and not options.entity and cableChargerPosition then
 		coords = cableChargerPosition
 	elseif not coords and entity and DoesEntityExist(entity) then
 		coords = GetEntityCoords(entity)
@@ -178,10 +233,15 @@ local function soundPayload(sound, options)
 end
 
 local function playSound(soundName, options)
+	options = options or {}
+	local portable = options.portable
+	if portable == nil then portable = sourceType == 'portable' end
+	if portable and soundName:sub(1, 6) == 'charge' then
+		soundName = 'portableCharge' .. soundName:sub(7)
+	end
 	local sound = settings.sounds and settings.sounds[soundName]
 
 	if not sound or not soundProviderAvailable() then return end
-	options = options or {}
 
 	if settings.soundProvider == 'interact-sound' then
 		return TriggerServerEvent('InteractSound_SV:PlayOnSource', sound.name, sound.volume)
@@ -199,6 +259,11 @@ local function playSound(soundName, options)
 	end
 
 	TriggerServerEvent('ox_fuel:playSound', soundName, payload)
+end
+
+local function playChargingEndSound(completed, options)
+	playSound('chargeStop', options)
+	if completed then playSound('chargeComplete', options) end
 end
 
 local function destroyLocalSound(id)
@@ -232,6 +297,12 @@ local function stopAllSounds()
 	end
 
 	activeSounds = {}
+end
+
+local function stopChargingSounds()
+	-- Stop both identities, including after the source type changes during cleanup.
+	stopSound('chargeLoop', true)
+	stopSound('portableChargeLoop', true)
 end
 
 local function playConnectorAnimation(soundName)
@@ -268,7 +339,8 @@ local function removeConnectorObject()
 end
 
 local function cleanup()
-	stopSound('chargeLoop', true)
+	connectorGeneration = connectorGeneration + 1
+	stopChargingSounds()
 
 	if selectingOptions then
 		checkout.cancel(true)
@@ -282,10 +354,15 @@ local function cleanup()
 	activeSessionType = nil
 	removeCable()
 	removeConnectorObject()
+	hardware.restore(sourceCharger, sourceDockSlot)
+	if sourceType == 'portable' and sourceCharger and DoesEntityExist(sourceCharger) then
+		Entity(sourceCharger).state:set('oxFuelPortableConnectorTaken', false, true)
+	end
 	releaseChargerLease()
 	attachedVehicle = nil
 	sourceCharger = nil
 	sourceType = nil
+	sourceDockSlot = nil
 	chargingSelection = nil
 end
 
@@ -384,6 +461,7 @@ local function attachConnectorToVehicle(vehicle)
 	)
 
 	attachedVehicle = vehicle
+	playSound('chargeConnect')
 
 	return true
 end
@@ -392,12 +470,16 @@ local function getChargerCablePosition()
 	local offset = sourceType == 'portable'
 		and (portableSettings.cableOffset or {})
 		or (settings.chargerCableOffset or {})
+	local slotOffset = sourceType == 'station'
+		and settings.chargerCableSlotOffsets
+		and settings.chargerCableSlotOffsets[sourceDockSlot or (pumpLease and pumpLease.slot) or 1]
+		or nil
 
 	return GetOffsetFromEntityInWorldCoords(
 		sourceCharger,
-		offset.x or 0.0,
-		offset.y or 0.0,
-		offset.z or (sourceType == 'portable' and 0.43 or 1.76)
+		(offset.x or 0.0) + (slotOffset and slotOffset.x or 0.0),
+		(offset.y or 0.0) + (slotOffset and slotOffset.y or 0.0),
+		(offset.z or (sourceType == 'portable' and 0.43 or 1.76)) + (slotOffset and slotOffset.z or 0.0)
 	)
 end
 
@@ -429,6 +511,12 @@ end
 
 local function createCable()
 	if settings.cable == false then return end
+	local generation, heldObject, charger = connectorGeneration, connectorObject, sourceCharger
+	local function validSource()
+		return generation == connectorGeneration and connectorObject == heldObject and sourceCharger == charger
+			and heldObject and DoesEntityExist(heldObject) and charger and DoesEntityExist(charger)
+	end
+	if not validSource() then return end
 
 	local texturesWereLoaded = RopeAreTexturesLoaded()
 
@@ -437,6 +525,7 @@ local function createCable()
 	local timeout = GetGameTimer() + 5000
 
 	while not RopeAreTexturesLoaded() and GetGameTimer() < timeout do Wait(0) end
+	if not validSource() then return end
 
 	if not RopeAreTexturesLoaded() then
 		return print('^3[ox_fuel] Unable to load rope textures; continuing without an EV charging cable.^0')
@@ -464,8 +553,8 @@ local function createCable()
 		return print('^3[ox_fuel] Unable to create the EV charging cable; continuing with the connector only.^0')
 	end
 
-	ActivatePhysics(cable)
 	Wait(100)
+	if not validSource() then return end
 	connectorPosition = getConnectorCablePosition()
 	attachLength = getCableLength(connectorPosition)
 
@@ -495,7 +584,7 @@ local function createCable()
 	CreateThread(function()
 		local heldObject = connectorObject
 
-		while cable and connectorObject == heldObject and DoesEntityExist(heldObject) and DoesRopeExist(cable) do
+		while generation == connectorGeneration and cable and connectorObject == heldObject and DoesEntityExist(heldObject) and DoesRopeExist(cable) do
 			local currentConnectorPosition = getConnectorCablePosition()
 
 			if cablePinnedVertex then
@@ -573,9 +662,10 @@ end
 local function stopChargingFlow(playStop)
 	local wasCharging = chargingActive
 	chargingActive = false
-	stopSound('chargeLoop', true)
+	stopChargingSounds()
 
 	if playStop and wasCharging then playSound('chargeStop') end
+	return wasCharging
 end
 
 local function abortConnector(message, playStop)
@@ -627,10 +717,20 @@ function charging.isChargerAvailable(charger)
 	if chargers.isDestroyed(charger) then return false end
 	if occupancySettings.enabled == false then return true end
 
-	local key = getChargerIdentity(charger)
-	local owner = key and occupiedChargers[key]
+	local key, model = getChargerIdentity(charger)
 
-	return not owner or owner == GetPlayerServerId(PlayerId())
+	if not key then return false end
+
+	local playerId = GetPlayerServerId(PlayerId())
+	local slotCount = pumpSlots.getSlotCount(occupancySettings, model)
+
+	for slot = 1, slotCount do
+		local owner = occupiedChargers[pumpSlots.getLeaseKey(key, slot)]
+
+		if not owner or owner == playerId then return true end
+	end
+
+	return false
 end
 
 function charging.isSourceCharger(entity)
@@ -725,11 +825,24 @@ local function notifyChargingError(message)
 	restoreConnectorReady()
 end
 
-local function beginConnectorSource(charger, connectorSourceType)
+local function beginConnectorSource(charger, connectorSourceType, requestedSlot)
+	connectorGeneration = connectorGeneration + 1
+	local generation = connectorGeneration
 	sourceType = connectorSourceType
 	sourceCharger = charger
+	sourceDockSlot = connectorSourceType == 'portable' and 1 or (pumpLease and pumpLease.slot or requestedSlot or getPreferredChargerSlot(charger))
 	lib.requestModel(settings.connectorModel)
 	playConnectorAnimation('chargePickup')
+
+	local function validSource()
+		return generation == connectorGeneration and sourceCharger == charger and sourceType == connectorSourceType
+			and DoesEntityExist(charger) and (connectorSourceType == 'portable' or not chargers.isDestroyed(charger))
+	end
+	if not validSource() then
+		SetModelAsNoLongerNeeded(settings.connectorModel)
+		if generation == connectorGeneration then cleanup() end
+		return
+	end
 
 	if cache.vehicle or state.isFueling then
 		SetModelAsNoLongerNeeded(settings.connectorModel)
@@ -738,7 +851,14 @@ local function beginConnectorSource(charger, connectorSourceType)
 	end
 
 	local coords = GetEntityCoords(cache.ped)
-	local object = CreateObject(settings.connectorModel, coords.x, coords.y, coords.z, true, true, false)
+	local object = hardware.take(charger, sourceDockSlot)
+	if not validSource() then
+		if object and DoesEntityExist(object) then DeleteEntity(object) end
+		SetModelAsNoLongerNeeded(settings.connectorModel)
+		if generation == connectorGeneration then cleanup() end
+		return
+	end
+	object = object or CreateObject(settings.connectorModel, coords.x, coords.y, coords.z, true, true, false)
 	SetModelAsNoLongerNeeded(settings.connectorModel)
 
 	if object == 0 then
@@ -751,17 +871,23 @@ local function beginConnectorSource(charger, connectorSourceType)
 	SetEntityInvincible(connectorObject, true)
 	ensureNetworked(connectorObject)
 	attachConnectorToHand()
+	if connectorSourceType == 'portable' then
+		Entity(charger).state:set('oxFuelPortableConnectorTaken', true, true)
+	elseif pumpLease then
+		TriggerServerEvent('ox_fuel:chargerConnectorTaken', pumpLease.key, pumpLease.token, true)
+	end
 	createCable()
-	meter.setPump(charger)
+	if not validSource() or connectorObject ~= object then return end
+	meter.setPump(charger, sourceDockSlot)
 	chargingSelection = connectorSourceType == 'portable' and portableSelection() or checkout.getElectricDefault()
 	showConnectorReady()
 
 	CreateThread(function()
-		local heldObject = connectorObject
+		local heldObject = object
 		local heartbeatMs = math.max(tonumber(occupancySettings.heartbeatMs) or 5000, 1000)
 		local nextHeartbeat = GetGameTimer() + heartbeatMs
 
-		while connectorObject == heldObject do
+		while generation == connectorGeneration and connectorObject == heldObject do
 			if not DoesEntityExist(heldObject)
 				or not sourceCharger
 				or not DoesEntityExist(sourceCharger)
@@ -788,9 +914,11 @@ local function beginConnectorSource(charger, connectorSourceType)
 
 	if connectorSourceType ~= 'portable' then
 		CreateThread(function()
-			local heldObject = connectorObject
+			local heldObject = object
+			if generation ~= connectorGeneration or connectorObject ~= heldObject then return end
 			selectingOptions = true
 			local selection = checkout.selectElectric(chargingSelection, locale('charge_options_title'))
+			if generation ~= connectorGeneration then return end
 			selectingOptions = false
 
 			if selection and connectorObject == heldObject then
@@ -801,7 +929,7 @@ local function beginConnectorSource(charger, connectorSourceType)
 	end
 end
 
-function charging.take(charger)
+function charging.take(charger, requestedSlot)
 	if charging.isHolding() or state.isFueling or cache.vehicle or lib.progressActive() then return end
 	if not charger or not DoesEntityExist(charger) then return end
 	if chargers.isDestroyed(charger) then
@@ -812,11 +940,18 @@ function charging.take(charger)
 		return lib.notify({ type = 'error', description = locale('charge_put_can_away') })
 	end
 
-	if not acquireChargerLease(charger) then
+	if not acquireChargerLease(charger, requestedSlot) then
 		return lib.notify({ type = 'error', description = locale('pump_in_use') })
 	end
 
-	beginConnectorSource(charger, 'station')
+	beginConnectorSource(charger, 'station', requestedSlot)
+end
+
+function charging.canTakePortable(charger)
+	return portablePack and portablePack.object == charger and not portablePack.busy and not portablePack.damaged
+		and (tonumber(portablePack.chargeKwh) or 0) > 0.0001
+		and not charging.isHolding() and not portableRechargeActive and not state.isFueling
+		and not cache.vehicle and not lib.progressActive()
 end
 
 function charging.takePortable(charger)
@@ -878,6 +1013,7 @@ local function playPortableGroundAnimation(pickingUp, packEntity)
 	lib.requestAnimDict(dictionary)
 	TaskPlayAnim(cache.ped, dictionary, clip, 4.0, 4.0, duration, 48, 0.0, false, false, false)
 	Wait(contactDelay)
+	playSound(pickingUp and 'portableLift' or 'portableDeploy', { entity = packEntity })
 
 	if pickingUp then
 		if packEntity and DoesEntityExist(packEntity) then SetEntityVisible(packEntity, false, false) end
@@ -915,6 +1051,10 @@ local function clearPortableFailure(pack)
 	chargers.stopPortableFailure(pack.failureEffect)
 	pack.failureEffect = nil
 	pack.damaged = false
+	if pack.object and DoesEntityExist(pack.object) then
+		Entity(pack.object).state:set('oxFuelPortableDamaged', false, true)
+		hardware.setEnabled(pack.object, true)
+	end
 end
 
 local function deletePortableObject(cancelDeployment)
@@ -924,6 +1064,7 @@ local function deletePortableObject(cancelDeployment)
 
 	removePortableTargets(pack)
 	clearPortableFailure(pack)
+	hardware.unregister(pack.object)
 
 	if pack.object and DoesEntityExist(pack.object) then
 		SetEntityAsMissionEntity(pack.object, true, true)
@@ -1044,7 +1185,7 @@ function charging.deployPortablePack(item)
 
 	if cache.vehicle or state.isFueling or IsEntityDead(cache.ped) then return end
 
-	local model = portableSettings.groundModel or `prop_torture_01`
+	local model = portableSettings.groundModel or `drs_ev_pack`
 	local deployDistance = math.max(tonumber(portableSettings.deployDistance) or 1.05, 0.5)
 	local coords = GetOffsetFromEntityInWorldCoords(cache.ped, 0.0, deployDistance, 0.0)
 	lib.requestModel(model)
@@ -1084,6 +1225,9 @@ function charging.deployPortablePack(item)
 		capacityKwh = deployment.capacityKwh,
 	}
 	registerPortableTargets(object)
+	Entity(object).state:set('oxFuelPortableConnectorTaken', false, true)
+	Entity(object).state:set('oxFuelPortableDamaged', false, true)
+	hardware.register(object, 'portable')
 	lib.notify({ type = 'success', description = locale('portable_deployed') })
 end
 
@@ -1221,7 +1365,7 @@ end
 function charging.buyPortable(charger)
 	if not charging.canBuyPortable(charger) then return end
 
-	meter.setPump(charger)
+	meter.setPump(charger, getPreferredChargerSlot(charger))
 	meter.show(meter.chargingReadyPayload(checkout.getElectricDefault()))
 
 	local selection = checkout.selectPortablePurchase(locale('portable_buy_options'))
@@ -1242,7 +1386,12 @@ function charging.buyPortable(charger)
 		false,
 		selection.paymentId,
 		GetEntityModel(charger),
-		{ x = chargerCoords.x, y = chargerCoords.y, z = chargerCoords.z }
+		{
+			x = chargerCoords.x,
+			y = chargerCoords.y,
+			z = chargerCoords.z,
+			slot = getPreferredChargerSlot(charger),
+		}
 	)
 
 	if not transaction then
@@ -1405,6 +1554,8 @@ function charging.damagePortablePack()
 	pack.chargeKwh = result.chargeKwh or 0
 	pack.capacityKwh = result.capacityKwh or pack.capacityKwh
 	pack.damaged = true
+	Entity(pack.object).state:set('oxFuelPortableDamaged', true, true)
+	hardware.setEnabled(pack.object, false)
 	pack.failureEffect = chargers.startPortableFailure(
 		pack.object,
 		GetEntityCoords(pack.object),
@@ -1423,7 +1574,7 @@ function charging.rechargePortable(charger)
 	portablePack.busy = true
 	sourceCharger = charger
 	sourceType = 'portable-recharge'
-	meter.setPump(charger)
+	meter.setPump(charger, pumpLease and pumpLease.slot or getPreferredChargerSlot(charger))
 	chargingSelection = checkout.getElectricDefault()
 	selectingOptions = true
 
@@ -1442,7 +1593,12 @@ function charging.rechargePortable(charger)
 		false,
 		portablePack.token,
 		GetEntityModel(charger),
-		{ x = chargerCoords.x, y = chargerCoords.y, z = chargerCoords.z },
+		{
+			x = chargerCoords.x,
+			y = chargerCoords.y,
+			z = chargerCoords.z,
+			slot = getPreferredChargerSlot(charger),
+		},
 		selection.modeId,
 		selection.paymentId
 	)
@@ -1480,9 +1636,16 @@ function charging.rechargePortable(charger)
 	local canceledByPlayer = false
 	local heartbeatMs = math.max(tonumber(occupancySettings.heartbeatMs) or 5000, 1000)
 	local nextHeartbeat = GetGameTimer() + heartbeatMs
+	local baseDisplayPowerKw = math.max(tonumber(selection.displayPowerKw) or 0, 0)
+	activePumpFlows[session.id] = activePumpFlows[session.id] or {
+		amountPerTick = energyPerTick,
+		multiplier = math.clamp(tonumber(session.flowMultiplier) or 1, 0.1, 1),
+	}
+	selection.displayPowerKw = baseDisplayPowerKw * activePumpFlows[session.id].multiplier
 
 	state.isFueling = true
 	chargingActive = true
+	playSound('chargeStart', { entity = charger, portable = false })
 	playSound('chargeLoop', { managed = true, entity = charger })
 	chargingRun = chargingRun + 1
 
@@ -1499,7 +1662,9 @@ function charging.rechargePortable(charger)
 		0,
 		nil,
 		nil,
-		session.maxTicks * tickSeconds
+		activePumpFlows[session.id].amountPerTick > 0
+			and (maxEnergy / activePumpFlows[session.id].amountPerTick) * tickSeconds
+			or 0
 	))
 
 	while state.isFueling and portableRechargeSessionId == session.id and completedTicks < session.maxTicks do
@@ -1512,7 +1677,9 @@ function charging.rechargePortable(charger)
 		end
 
 		local nextTicks = completedTicks + 1
-		local nextEnergy = math.min(nextTicks * energyPerTick, maxEnergy)
+		local activeFlow = activePumpFlows[session.id]
+		local tickEnergy = activeFlow and activeFlow.amountPerTick or energyPerTick
+		local nextEnergy = math.min(transferredEnergy + tickEnergy, maxEnergy)
 		local nextPrice = roundPrice(nextEnergy * pricePerKwh)
 
 		if nextPrice > moneyAmount then break end
@@ -1521,6 +1688,7 @@ function charging.rechargePortable(charger)
 		transferredEnergy = nextEnergy
 		price = nextPrice
 		chargeKwh = math.min(initialCharge + transferredEnergy, capacity)
+		selection.displayPowerKw = baseDisplayPowerKw * (activeFlow and activeFlow.multiplier or 1)
 
 		meter.update(portableRechargePayload(
 			session,
@@ -1530,7 +1698,7 @@ function charging.rechargePortable(charger)
 			price,
 			nil,
 			nil,
-			math.max(session.maxTicks - completedTicks, 0) * tickSeconds
+			tickEnergy > 0 and math.max(maxEnergy - transferredEnergy, 0) / tickEnergy * tickSeconds or 0
 		))
 
 		if transferredEnergy >= maxEnergy - 0.0001 or completedTicks >= session.maxTicks then
@@ -1546,7 +1714,8 @@ function charging.rechargePortable(charger)
 	end
 
 	state.isFueling = false
-	stopChargingFlow(true)
+	local endedFlow = stopChargingFlow(false)
+	local finishGeneration = connectorGeneration
 
 	local result
 
@@ -1554,6 +1723,7 @@ function charging.rechargePortable(charger)
 		portableRechargeSessionId = nil
 		result = lib.callback.await('ox_fuel:finishPortableRecharge', false, session.id, completedTicks)
 	end
+	activePumpFlows[session.id] = nil
 
 	if result and portablePack then
 		portablePack.chargeKwh = result.chargeKwh
@@ -1563,6 +1733,9 @@ function charging.rechargePortable(charger)
 
 	local finalCharge = result and result.chargeKwh or initialCharge
 	local completed = result and not canceledByPlayer and finalCharge >= capacity - 0.0001
+	if endedFlow and finishGeneration == connectorGeneration then
+		playChargingEndSound(completed, { entity = charger, portable = false })
+	end
 	local finalPayload = portableRechargePayload(
 		session,
 		selection,
@@ -1620,7 +1793,6 @@ function charging.start(vehicle)
 
 	Wait(500)
 	chargingActive = true
-	playSound('chargeLoop', { managed = true })
 
 	local session
 
@@ -1660,6 +1832,8 @@ function charging.start(vehicle)
 	activeSessionId = session.id
 	activeSessionType = portableSession and 'portable' or 'station'
 	local connectorAttached = attachConnectorToVehicle(vehicle)
+	playSound('chargeStart')
+	playSound('chargeLoop', { managed = true })
 	selection = {
 		modeId = session.modeId,
 		modeLabel = session.modeLabel,
@@ -1690,6 +1864,12 @@ function charging.start(vehicle)
 	local chaosFault = session.chaosFault
 	local faulted = false
 	local dictionary
+	local baseDisplayPowerKw = math.max(tonumber(selection.displayPowerKw) or 0, 0)
+	activePumpFlows[session.id] = activePumpFlows[session.id] or {
+		amountPerTick = energyPerTick,
+		multiplier = math.clamp(tonumber(session.flowMultiplier) or 1, 0.1, 1),
+	}
+	selection.displayPowerKw = baseDisplayPowerKw * activePumpFlows[session.id].multiplier
 
 	if not connectorAttached then
 		dictionary = 'timetable@gardener@filling_can'
@@ -1716,7 +1896,9 @@ function charging.start(vehicle)
 		selection,
 		nil,
 		nil,
-		session.maxTicks * tickSeconds,
+		activePumpFlows[session.id].amountPerTick > 0
+			and (maxEnergy / activePumpFlows[session.id].amountPerTick) * tickSeconds
+			or 0,
 		packStartCharge
 	))
 
@@ -1729,7 +1911,9 @@ function charging.start(vehicle)
 		end
 
 		local nextTicks = completedTicks + 1
-		local nextEnergy = math.min(nextTicks * energyPerTick, maxEnergy)
+		local activeFlow = activePumpFlows[session.id]
+		local tickEnergy = activeFlow and activeFlow.amountPerTick or energyPerTick
+		local nextEnergy = math.min(transferredEnergy + tickEnergy, maxEnergy)
 		local nextPrice = roundPrice(nextEnergy * pricePerKwh)
 
 		if nextPrice > moneyAmount then break end
@@ -1738,6 +1922,7 @@ function charging.start(vehicle)
 		transferredEnergy = nextEnergy
 		price = nextPrice
 		fuelAmount = math.min(initialFuel + ((transferredEnergy / batteryCapacity) * 100), 100.0)
+		selection.displayPowerKw = baseDisplayPowerKw * (activeFlow and activeFlow.multiplier or 1)
 
 		meter.update(chargingPayload(
 			initialFuel,
@@ -1748,7 +1933,7 @@ function charging.start(vehicle)
 			selection,
 			nil,
 			nil,
-			math.max(session.maxTicks - completedTicks, 0) * tickSeconds,
+			tickEnergy > 0 and math.max(maxEnergy - transferredEnergy, 0) / tickEnergy * tickSeconds or 0,
 			packStartCharge and math.max(packStartCharge - transferredEnergy, 0) or nil
 		))
 
@@ -1777,7 +1962,8 @@ function charging.start(vehicle)
 	end
 
 	state.isFueling = false
-	stopChargingFlow(true)
+	local endedFlow = stopChargingFlow(false)
+	local finishGeneration = connectorGeneration
 
 	if dictionary then
 		ClearPedTasks(cache.ped)
@@ -1796,6 +1982,7 @@ function charging.start(vehicle)
 			completedTicks
 		)
 	end
+	activePumpFlows[session.id] = nil
 
 	if portableSession and portablePack and result and result.packChargeKwh ~= nil then
 		portablePack.chargeKwh = result.packChargeKwh
@@ -1806,6 +1993,7 @@ function charging.start(vehicle)
 	local finalPrice = result and result.price or 0
 	local finalEnergy = result and result.energy or 0
 	local completed = result and completedNaturally and not canceledByPlayer
+	if endedFlow and finishGeneration == connectorGeneration then playChargingEndSound(completed) end
 	local finalPayload = chargingPayload(
 		initialFuel,
 		finalFuel,
@@ -1830,7 +2018,7 @@ function charging.detachFromVehicle(vehicle)
 
 	state.isFueling = false
 	stopChargingFlow(true)
-	playConnectorAnimation()
+	playConnectorAnimation('chargeDisconnect')
 	attachConnectorToHand()
 
 	return true
@@ -1874,7 +2062,8 @@ AddEventHandler('ox_fuel:chargerDestroying', function(charger)
 end)
 
 AddEventHandler('ox_fuel:chargerFaultSound', function(charger, position)
-	playSound('chargeFault', { entity = charger, position = position })
+	local portable = charger and DoesEntityExist(charger) and GetEntityModel(charger) == portableSettings.groundModel
+	playSound('chargeFault', { entity = charger, position = position, portable = portable == true })
 end)
 
 AddEventHandler('onClientResourceStop', function(resource)

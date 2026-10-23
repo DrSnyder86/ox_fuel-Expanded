@@ -18,6 +18,8 @@
 	"remove_charge_connector": "Remove charging connector",
 	"change_charge_options": "Charging and payment options",
 	"start_charging": "Start charging",
+	"charge_screen_unavailable": "The station screen is unavailable. Return the connector and try again.",
+	"fuel_screen_unavailable": "The pump screen is unavailable. Return the nozzle and try again.",
 	"charge_options_title": "Charging options",
 	"charge_mode": "Charging speed",
 	"charge_put_can_away": "Put your can away before using the charger",

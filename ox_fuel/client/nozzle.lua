@@ -5,6 +5,8 @@ local meter = require 'client.meter'
 local checkout = require 'client.checkout'
 local customPumps = require 'client.custom_pumps'
 local chaos = require 'client.chaos'
+local pumpSlots = require 'pump_slots'
+local hardware = require 'client.charger_hardware'
 
 local settings = config.nozzle
 local nozzle = {}
@@ -18,12 +20,18 @@ local hoseMaxLength
 local ownsHoseTextures = false
 local fueling = false
 local soundCounter = 0
+local fuelingSoundSession = 0
 local activeSounds = {}
 local occupancySettings = config.pumpOccupancy or {}
 local occupiedPumps = {}
 local pumpLease
 local pumpSelection
 local selectingOptions = false
+local sourceDockSlot
+local nozzleGeneration = 0
+local taking = false
+local occupancyChanges = {}
+local snapshotPending = true
 
 local function clamp(value, min, max)
 	if min > max then
@@ -55,17 +63,35 @@ local function getPumpIdentity(pump)
 	return key, model, { x = coords.x, y = coords.y, z = coords.z }
 end
 
-local function acquirePumpLease(pump)
+local function getPreferredPumpSlot(pump)
+	if not pump or not DoesEntityExist(pump) then return 1 end
+
+	local playerCoords = GetEntityCoords(cache.ped)
+	local playerOffset = GetOffsetFromEntityGivenWorldCoords(pump, playerCoords.x, playerCoords.y, playerCoords.z)
+
+	return pumpSlots.getPreferredSlot(playerOffset.x)
+end
+
+local function acquirePumpLease(pump, requestedSlot, generation)
 	if occupancySettings.enabled == false then return true end
 
 	local key, model, position = getPumpIdentity(pump)
 
 	if not key then return false end
+	position.slot = requestedSlot or getPreferredPumpSlot(pump)
 
 	local lease = lib.callback.await('ox_fuel:acquirePump', false, model, position)
+	if generation ~= nozzleGeneration then
+		if lease and not lease.disabled then TriggerServerEvent('ox_fuel:releasePump', lease.key, lease.token) end
+		return false
+	end
 
 	if not lease then return false end
 	if lease.disabled then return true end
+	if requestedSlot and lease.slot ~= requestedSlot then
+		TriggerServerEvent('ox_fuel:releasePump', lease.key, lease.token)
+		return false
+	end
 
 	pumpLease = lease
 	occupiedPumps[lease.key] = lease.owner or GetPlayerServerId(PlayerId())
@@ -83,22 +109,30 @@ local function releasePumpLease()
 	TriggerServerEvent('ox_fuel:releasePump', lease.key, lease.token)
 end
 
-RegisterNetEvent('ox_fuel:pumpOccupancyChanged', function(key, owner)
+RegisterNetEvent('ox_fuel:pumpOccupancyChanged', function(key, owner, taken)
 	if type(key) ~= 'string' then return end
 
 	occupiedPumps[key] = owner or nil
+	if snapshotPending then occupancyChanges[key] = { owner = owner, taken = taken } end
+	hardware.setOccupancy(key, owner, taken)
 end)
 
 CreateThread(function()
-	if occupancySettings.enabled == false then return end
+	if occupancySettings.enabled == false then snapshotPending = false return end
 
 	Wait(500)
 
-	local snapshot = lib.callback.await('ox_fuel:getPumpOccupancy', false)
+	local snapshot, taken = lib.callback.await('ox_fuel:getPumpOccupancy', false)
 
 	if type(snapshot) == 'table' then
+		taken = type(taken) == 'table' and taken or {}
+		for key, change in pairs(occupancyChanges) do
+			snapshot[key], taken[key] = change.owner or nil, change.taken == true or nil
+		end
 		occupiedPumps = snapshot
+		hardware.setSnapshot(snapshot, taken)
 	end
+	snapshotPending, occupancyChanges = false, {}
 end)
 
 local function soundProviderAvailable()
@@ -139,7 +173,7 @@ end
 local function soundPayload(sound)
 	local entity
 
-	if sound.source == 'pump' then
+	if sound.source == 'pump' or sound.source == 'holder' then
 		entity = sourcePump
 	elseif sound.source == 'nozzle' then
 		entity = nozzleObject
@@ -147,7 +181,15 @@ local function soundPayload(sound)
 
 	local coords = entity and DoesEntityExist(entity) and GetEntityCoords(entity) or nil
 
-	if sound.source == 'pump' and hosePumpPosition then
+	if sound.source == 'holder' and entity and DoesEntityExist(entity) then
+		local ron = config.ronPump or {}
+		local dock = GetEntityModel(entity) == ron.model and ron.docking and ron.docking.slots
+			and ron.docking.slots[sourceDockSlot or 1]
+		local offset = dock and dock.offset or (settings.pumpOffsets or {})[GetEntityModel(entity)] or {}
+		local height = (settings.pumpHeights or {})[GetEntityModel(entity)] or settings.pumpHeight or 1.25
+		coords = GetOffsetFromEntityInWorldCoords(entity, offset.x or 0.0, offset.y or 0.0,
+			dock and (offset.z or 0.0) or height + (offset.z or 0.0))
+	elseif sound.source == 'pump' and hosePumpPosition then
 		coords = hosePumpPosition
 	end
 
@@ -258,6 +300,9 @@ local function removeNozzleObject()
 end
 
 local function cleanup()
+	nozzleGeneration = nozzleGeneration + 1
+	fuelingSoundSession = fuelingSoundSession + 1
+	taking = false
 	stopSound('refuel', true)
 
 	if selectingOptions then
@@ -270,9 +315,11 @@ local function cleanup()
 	fueling = false
 	removeHose()
 	removeNozzleObject()
+	hardware.restore(sourcePump, sourceDockSlot)
 	releasePumpLease()
 	attachedVehicle = nil
 	sourcePump = nil
+	sourceDockSlot = nil
 	pumpSelection = nil
 end
 
@@ -307,6 +354,12 @@ local function getPumpOffset()
 end
 
 local function getPumpAnchorPosition()
+	local ron = config.ronPump or {}
+	if ron.enabled == true and GetEntityModel(sourcePump) == ron.model then
+		local slot = ron.docking and ron.docking.slots and ron.docking.slots[sourceDockSlot or 1]
+		local anchor = slot and slot.anchor
+		if anchor then return GetOffsetFromEntityInWorldCoords(sourcePump, anchor.x, anchor.y, anchor.z) end
+	end
 	local height = getPumpHeight()
 
 	if settings.anchorToPumpSide == false then
@@ -326,7 +379,10 @@ local function getPumpAnchorPosition()
 	local minY, maxY = minDim.y + edgePadding, maxDim.y - edgePadding
 	local x, y = 0.0, 0.0
 
-	if math.abs(playerOffset.x) > math.abs(playerOffset.y) then
+	if pumpLease and (pumpLease.slotCount or 1) > 1 then
+		x = pumpLease.slot == 1 and minX or maxX
+		y = clamp(0.0, minY, maxY)
+	elseif math.abs(playerOffset.x) > math.abs(playerOffset.y) then
 		x = playerOffset.x > 0.0 and maxX or minX
 		y = clamp(playerOffset.y, minY, maxY)
 	else
@@ -339,11 +395,20 @@ local function getPumpAnchorPosition()
 	y = y * anchorScale
 
 	local offset = getPumpOffset()
+	local slotOffsets = settings.pumpSlotOffsets
+	local modelSlotOffsets = slotOffsets and slotOffsets[GetEntityModel(sourcePump)]
+	local slotOffset = pumpLease and modelSlotOffsets and modelSlotOffsets[pumpLease.slot]
 
 	if offset then
 		x = x + (offset.x or 0.0)
 		y = y + (offset.y or 0.0)
 		height = height + (offset.z or 0.0)
+	end
+
+	if slotOffset then
+		x = x + (slotOffset.x or 0.0)
+		y = y + (slotOffset.y or 0.0)
+		height = height + (slotOffset.z or 0.0)
 	end
 
 	return GetOffsetFromEntityInWorldCoords(sourcePump, x, y, height)
@@ -458,6 +523,9 @@ end
 
 local function createHose()
 	if not settings.hose then return end
+	local generation, object, pump = nozzleGeneration, nozzleObject, sourcePump
+	local function valid() return generation == nozzleGeneration and object == nozzleObject and pump == sourcePump
+		and object and pump and DoesEntityExist(object) and DoesEntityExist(pump) end
 
 	local texturesWereLoaded = RopeAreTexturesLoaded()
 
@@ -465,9 +533,10 @@ local function createHose()
 
 	local timeout = GetGameTimer() + 5000
 
-	while not RopeAreTexturesLoaded() and GetGameTimer() < timeout do
+	while valid() and not RopeAreTexturesLoaded() and GetGameTimer() < timeout do
 		Wait(0)
 	end
+	if not valid() then return end
 
 	if not RopeAreTexturesLoaded() then
 		print('^3[ox_fuel] Unable to load rope textures; continuing without a fuel hose.^0')
@@ -497,8 +566,8 @@ local function createHose()
 		return
 	end
 
-	ActivatePhysics(hose)
 	Wait(100)
+	if not valid() then return end
 
 	nozzlePosition = getNozzleAnchorPosition()
 	attachLength = getHoseLength(nozzlePosition)
@@ -538,10 +607,24 @@ end
 function nozzle.isPumpAvailable(pump)
 	if occupancySettings.enabled == false then return true end
 
-	local key = getPumpIdentity(pump)
-	local owner = key and occupiedPumps[key]
+	local key, model = getPumpIdentity(pump)
 
-	return not owner or owner == GetPlayerServerId(PlayerId())
+	if not key then return false end
+
+	local playerId = GetPlayerServerId(PlayerId())
+	local slotCount = pumpSlots.getSlotCount(occupancySettings, model)
+
+	for slot = 1, slotCount do
+		local owner = occupiedPumps[pumpSlots.getLeaseKey(key, slot)]
+
+		if not owner or owner == playerId then return true end
+	end
+
+	return false
+end
+
+function nozzle.getPreferredPumpSlot(pump)
+	return getPreferredPumpSlot(pump)
 end
 
 function nozzle.isFueling()
@@ -581,7 +664,9 @@ function nozzle.startFueling(vehicle)
 	if not nozzle.isInHand() or not nozzle.isInRange() then return false end
 
 	fueling = true
-	attachNozzleToVehicle(vehicle)
+	fuelingSoundSession = fuelingSoundSession + 1
+	if attachNozzleToVehicle(vehicle) then playSound('connect') end
+	playSound('start')
 	playSound('refuel', { managed = true })
 
 	return true
@@ -592,18 +677,31 @@ function nozzle.stopFueling(returnToHand)
 	fueling = false
 	stopSound('refuel', true)
 
-	if wasFueling then playSound('stop') end
+	if wasFueling then
+		playSound('pumpStop')
+		playSound('stop')
+	end
 	if returnToHand or not nozzle.isAttachedToVehicle() then attachNozzleToHand() end
+end
+
+function nozzle.getSoundSession()
+	return fuelingSoundSession
+end
+
+function nozzle.completeFueling(session)
+	if session == fuelingSoundSession and nozzle.isHolding() and not fueling then playSound('complete') end
 end
 
 function nozzle.pauseFueling(durationMs)
 	if not fueling then return end
 
 	stopSound('refuel', true)
+	playSound('pumpStop')
 	playSound('stop')
 	Wait(math.max(math.floor(tonumber(durationMs) or 1500), 250))
 
 	if fueling and state.isFueling and nozzle.isHolding() then
+		playSound('start')
 		playSound('refuel', { managed = true })
 	end
 end
@@ -613,7 +711,7 @@ function nozzle.detachFromVehicle(vehicle)
 
 	state.isFueling = false
 	nozzle.stopFueling(false)
-	playPumpAnimation()
+	playPumpAnimation('disconnect')
 	attachNozzleToHand()
 
 	return true
@@ -649,31 +747,51 @@ AddEventHandler('ox_fuel:customPumpDestroying', function(pump)
 	if sourcePump == pump then abortNozzle(locale('fuel_pump_destroyed')) end
 end)
 
-function nozzle.take(pump)
-	if nozzle.isHolding() or state.isFueling or cache.vehicle or lib.progressActive() then return end
+function nozzle.take(pump, requestedSlot)
+	if taking or nozzle.isHolding() or state.isFueling or cache.vehicle or lib.progressActive() then return end
 	if not pump or not DoesEntityExist(pump) then return end
 
 	if state.petrolCan then
 		return lib.notify({ type = 'error', description = locale('pump_fuel_with_can') })
 	end
 
-	if not acquirePumpLease(pump) then
+	requestedSlot = tonumber(requestedSlot)
+	if requestedSlot ~= 1 and requestedSlot ~= 2 then requestedSlot = nil end
+	nozzleGeneration = nozzleGeneration + 1
+	local generation = nozzleGeneration
+	taking = true
+	if not acquirePumpLease(pump, requestedSlot, generation) then
+		if generation ~= nozzleGeneration then return end
+		taking = false
 		return lib.notify({ type = 'error', description = locale('pump_in_use') })
 	end
 
 	sourcePump = pump
-
-	lib.requestModel(settings.model)
+	sourceDockSlot = pumpLease and pumpLease.slot or requestedSlot or getPreferredPumpSlot(pump)
+	local modelLoaded = pcall(lib.requestModel, settings.model, 5000)
+	if not modelLoaded then
+		if generation == nozzleGeneration then cleanup() end
+		return print('^1[ox_fuel] Unable to load the fuel nozzle model.^0')
+	end
+	if generation ~= nozzleGeneration then SetModelAsNoLongerNeeded(settings.model) return end
 	playPumpAnimation('pickup')
 
-	if cache.vehicle or state.isFueling then
+	if generation ~= nozzleGeneration then SetModelAsNoLongerNeeded(settings.model) return end
+	if not DoesEntityExist(pump) or cache.vehicle or state.isFueling then
 		SetModelAsNoLongerNeeded(settings.model)
 		cleanup()
 		return
 	end
 
 	local coords = GetEntityCoords(cache.ped)
-	local object = CreateObject(settings.model, coords.x, coords.y, coords.z, true, true, false)
+	local object = hardware.take(pump, sourceDockSlot)
+	if generation ~= nozzleGeneration or not DoesEntityExist(pump) then
+		if object and DoesEntityExist(object) then DeleteEntity(object) end
+		SetModelAsNoLongerNeeded(settings.model)
+		if generation == nozzleGeneration then cleanup() end
+		return
+	end
+	object = object or CreateObject(settings.model, coords.x, coords.y, coords.z, true, true, false)
 
 	SetModelAsNoLongerNeeded(settings.model)
 
@@ -683,24 +801,29 @@ function nozzle.take(pump)
 	end
 
 	nozzleObject = object
+	taking = false
 	sourcePump = pump
 
 	SetEntityAsMissionEntity(nozzleObject, true, true)
 	SetEntityInvincible(nozzleObject, true)
 	ensureNetworked(nozzleObject)
 	attachNozzleToHand()
+	if pumpLease and config.ronPump and GetEntityModel(pump) == config.ronPump.model then
+		TriggerServerEvent('ox_fuel:pumpNozzleTaken', pumpLease.key, pumpLease.token, true)
+	end
 
 	createHose()
-	meter.setPump(pump)
+	if generation ~= nozzleGeneration or nozzleObject ~= object then return end
+	meter.setPump(pump, sourceDockSlot)
 	pumpSelection = checkout.getDefault()
 	meter.show(meter.readyPayload(pumpSelection))
 
 	CreateThread(function()
-		local heldObject = nozzleObject
+		local heldObject = object
 		local heartbeatMs = math.max(tonumber(occupancySettings.heartbeatMs) or 5000, 1000)
 		local nextHeartbeat = GetGameTimer() + heartbeatMs
 
-		while nozzleObject == heldObject do
+		while generation == nozzleGeneration and nozzleObject == heldObject do
 			if not DoesEntityExist(heldObject)
 				or not sourcePump
 				or not DoesEntityExist(sourcePump)
@@ -747,9 +870,11 @@ function nozzle.take(pump)
 	end)
 
 	CreateThread(function()
-		local heldObject = nozzleObject
+		local heldObject = object
+		if generation ~= nozzleGeneration or nozzleObject ~= heldObject then return end
 		selectingOptions = true
 		local selection = checkout.select(pumpSelection, locale('fuel_options_title'))
+		if generation ~= nozzleGeneration or nozzleObject ~= heldObject then return end
 		selectingOptions = false
 
 		if selection and nozzleObject == heldObject then

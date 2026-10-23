@@ -1,5 +1,6 @@
 local config = require 'config'
 local vehicleProfiles = require 'vehicle_profiles'
+local stationDisplay = require 'client.station_display'
 local settings = config.fuelMeter or {}
 local fuelingSettings = config.fueling or {}
 local meter = {}
@@ -39,7 +40,8 @@ function meter.getUnitPrice(pricePerGallon)
 	return unit == 'liters' and pricePerGallon / 3.785411784 or pricePerGallon
 end
 
-function meter.setPump(pump)
+function meter.setPump(pump, slot)
+	stationDisplay.setPump(pump, slot)
 	if not pump or not DoesEntityExist(pump) then
 		activePumpDisplay = nil
 		return
@@ -50,6 +52,7 @@ function meter.setPump(pump)
 end
 
 function meter.clearPump()
+	stationDisplay.clearPump()
 	activePumpDisplay = nil
 end
 
@@ -120,12 +123,26 @@ local function send(action, data)
 	data.action = action
 	data.currency = settings.currency or '$'
 
-	SendNUIMessage(data)
+	if stationDisplay.send(data) then
+		SendNUIMessage({ action = 'hide' })
+	else
+		SendNUIMessage(data)
+	end
 end
 
 local function releaseNuiFocus()
 	SetNuiFocus(false, false)
 	SetNuiFocusKeepInput(false)
+end
+
+stationDisplay.onPresentationChanged = function(inWorld)
+	if not stationDisplay.hasPump() then return end
+	local onModel = stationDisplay.usesModelOnly() or inWorld
+	SendNUIMessage(onModel and { action = 'hide' } or stationDisplay.getHudPayload())
+	if pendingCheckout then
+		SetNuiFocus(not onModel, not onModel)
+		SetNuiFocusKeepInput(false)
+	end
 end
 
 local function resolveCheckout(result, hideImmediately)
@@ -149,12 +166,17 @@ function meter.selectOptions(data)
 	if not meter.usesNuiCheckout() then return end
 
 	if pendingCheckout then resolveCheckout(false) end
+	if stationDisplay.usesModelOnly() and not stationDisplay.awaitReady() then
+		lib.notify({ type = 'error', description = locale(stationDisplay.getMode() == 'pump' and 'fuel_screen_unavailable' or 'charge_screen_unavailable') })
+		return
+	end
 
 	local pending = promise.new()
 	pendingCheckout = pending
 	data = meter.applyPumpDisplay(data or {})
 	send('options', data)
-	SetNuiFocus(true, true)
+	local inWorld = stationDisplay.usesModelOnly() or stationDisplay.canPresent()
+	SetNuiFocus(not inWorld, not inWorld)
 	SetNuiFocusKeepInput(false)
 
 	local result = Citizen.Await(pending)
@@ -165,6 +187,8 @@ end
 function meter.cancelOptions(hideImmediately)
 	return resolveCheckout(false, hideImmediately == true)
 end
+
+stationDisplay.onCheckoutCancel = function() meter.cancelOptions() end
 
 RegisterNUICallback('checkoutSubmit', function(data, callback)
 	callback({ ok = resolveCheckout(type(data) == 'table' and data or false) })

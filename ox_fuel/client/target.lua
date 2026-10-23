@@ -311,6 +311,27 @@ end
 
 exports.ox_target:addModel(config.pumpModels, pumpOptions)
 
+if nozzle or charging then
+	require('client.charger_hardware').setInteraction({
+		canTake = function(entity, kind)
+			if kind == 'pump' then
+				return nozzle and DoesEntityExist(entity) and nozzle.isPumpAvailable(entity)
+					and not nozzle.isHolding() and (not charging or not charging.isHolding())
+					and not state.isFueling and not cache.vehicle and not lib.progressActive()
+			end
+			if not charging then return false end
+			if nozzle and nozzle.isHolding() then return false end
+			if kind == 'portable' then return charging.canTakePortable(entity) end
+			return DoesEntityExist(entity) and charging.isChargerAvailable(entity)
+				and not charging.isHolding() and not state.isFueling and not cache.vehicle and not lib.progressActive()
+		end,
+		take = function(entity, kind, slot)
+			if kind == 'pump' then nozzle.take(entity, slot)
+			elseif kind == 'portable' then charging.takePortable(entity)
+			else charging.take(entity, slot) end
+		end,
+	})
+end
 if charging and #chargerOptions > 0 then
 	exports.ox_target:addModel(config.electric.chargerModel, chargerOptions)
 end

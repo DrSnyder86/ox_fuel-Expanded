@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.2-expanded.3 - Original hardware and shared stations
+
+- Added the original DRS Sentinel EV station, connector, portable hardware, parked cables, cabinet-only checkout, synchronized pickup, and restrained night lighting.
+- Added the original illuminated RON style-A replacement pump with dual docked handles, front/rear live registers, native night lighting, collision, damage synchronization, and reversible map-prop replacement.
+- Added the original universal `drs_fuel_nozzle` model across every gas-pump brand while preserving existing hand, vehicle, holder, and hose transforms. The matching `ox_fuel_assets` companion is version `1.2.6`.
+- Added two synchronized hose/connector slots to every configured gas pump and EV charger except `prop_vintage_pump`, with side-aware anchors and independently leased handles.
+- Added configurable shared-use flow reduction that updates both active sessions and restores full speed when either side stops.
+- Extended slot leasing to fuel-can and portable-power station transactions without treating idle handles as active flow.
+- Replaced legacy interaction sweeps with a compact resource-local 13-file audio bank and stable, independently managed gas, station-EV, and portable sound IDs.
+- Refined RON cabinet controls, physical checkout layout, docks, LOD distances, and Sentinel hardware presentation while retaining server-authoritative pricing and settlement.
+- Removed the invalid entity-only physics activation from rope handles, preserving hose/cable creation and cleanup without the native crash path.
+
 ## 1.5.2-expanded.2 - Portable power and optional Chaos Mode
 
 - Added the purchasable, deployable, damageable, rechargeable 12 kWh portable EV power unit with unique inventory metadata, physical connector/cable, positional audio, placement animations, and a compact interface.

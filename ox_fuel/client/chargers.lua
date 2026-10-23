@@ -1,6 +1,8 @@
 local config = require 'config'
 local utils = require 'client.utils'
 local propImpacts = require 'client.prop_impacts'
+local stationDisplay = require 'client.station_display'
+local hardware = require 'client.charger_hardware'
 
 local settings = config.electric or {}
 local damageSettings = settings.damageEffects or {}
@@ -97,6 +99,9 @@ local function configureOwnedCharger(entity, index, location)
 	SetEntityHeading(entity, ((location.w or location[4] or 0.0) + (tonumber(settings.headingOffset) or 0.0)) % 360.0)
 	FreezeEntityPosition(entity, true)
 	SetEntityInvincible(entity, true)
+	if type(SetEntityLodDist) == 'function' then
+		SetEntityLodDist(entity, math.min(math.max(math.floor(tonumber(settings.modelLodDistance) or 180), 1), 250))
+	end
 end
 
 local function remember(entity, index, ownsEntity, entry, location)
@@ -112,6 +117,8 @@ local function remember(entity, index, ownsEntity, entry, location)
 	spawned[#spawned + 1] = record
 	recordsByEntity[entity] = record
 	recordsByIndex[index] = record
+	stationDisplay.register(entity)
+	hardware.register(entity, 'station')
 
 	return record
 end
@@ -313,6 +320,8 @@ local function destroyCharger(index, showFailure, playFaultSound)
 	if not record or record.destroyed then return end
 
 	TriggerEvent('ox_fuel:chargerDestroying', record.entity)
+	stationDisplay.unregister(record.entity)
+	hardware.unregister(record.entity)
 	record.destroyed = true
 	destroyedEntities[record.entity] = true
 
@@ -614,6 +623,8 @@ function chargers.cleanup()
 		local record = spawned[i]
 		local entity = record.entity
 
+		stationDisplay.unregister(entity)
+		hardware.unregister(entity)
 		if record.owned and DoesEntityExist(entity) then
 			SetEntityAsMissionEntity(entity, true, true)
 			DeleteEntity(entity)

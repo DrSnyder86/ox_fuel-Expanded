@@ -5,7 +5,7 @@ game 'gta5'
 
 name 'ox_fuel_expanded'
 author 'Overextended, CommunityOx contributors, and ox_fuel Expanded contributors'
-version '1.5.2-expanded.2'
+version '1.5.2-expanded.3'
 description 'Expanded community preview of ox_fuel with physical pumps, EV charging, positional audio, and a live register UI'
 
 dependencies {
@@ -34,6 +34,8 @@ files {
 	'locales/*.json',
 	'data/stations.lua',
 	'nozzle_offsets.lua',
+	'pump_slots.lua',
+	'pump_flow.lua',
 	'fuel_grades.lua',
 	'vehicle_profiles.lua',
 	'client/*.lua',
@@ -43,6 +45,8 @@ files {
 	'web/app.js',
 	'web/ev.js',
 	'web/checkout.js',
+	'web/station.js',
+	'web/station.css',
 	'web/logos/*.png',
 	'web/logos/ui/*.png',
 }

@@ -22,6 +22,7 @@ local fuel  = require 'client.fuel'
 
 local customPumps = require 'client.custom_pumps'
 local chargers = require 'client.chargers'
+local ronPumps = require 'client.ron_pumps'
 require 'client.stations'
 
 local function startDrivingVehicle()
@@ -176,6 +177,7 @@ AddEventHandler('onClientResourceStop', function(resource)
 	local cleanupSteps = {
 		{ 'charging state', charging and charging.shutdown },
 		{ 'fuel nozzle state', nozzle and nozzle.shutdown },
+		{ 'RON replacements', ronPumps.cleanup },
 		{ 'charging station props', chargers.cleanup },
 		{ 'custom gas pump props', customPumps.cleanup },
 	}

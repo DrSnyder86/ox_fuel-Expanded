@@ -8,7 +8,10 @@ Maintained source and downloads: [DrSnyder86/ox_fuel-Expanded](https://github.co
 
 ## Highlights
 
+- Original DRS Sentinel hardware: dual-screen cabinet, matching connector, portable pack, and visible docked cables.
+- Beta RON style-A pump: off-white cabinet, illuminated branding/amber trim, two real docked fuel nozzles, and front/rear live registers.
 - Physical fuel nozzles and EV connectors with hoses, cables, sounds, animations, and vehicle attachment.
+- Original universal DRS fuel nozzle: graphite rubber body, metal trigger/spout, and reinforced hose union across all gas pumps.
 - Automatic fuel-cap detection plus 669 adapted vehicle mount profiles and live offset editors.
 - Regular and Premium grades, realistic class-based tank sizes, and configurable consumption rates.
 - Cash and bank payment support for Qbox, QBCore, ESX, and custom providers.
@@ -32,7 +35,7 @@ Maintained source and downloads: [DrSnyder86/ox_fuel-Expanded](https://github.co
 
 1. Install the included `ox_fuel` and `ox_fuel_assets` folders.
 2. Disable any other fuel resource.
-3. [Download and install San Andreas Sound Suite](https://drsnyder-fivem-site.pages.dev/scripts/san-andreas-sound-suite), then copy the seven `.ogg` files from `ox_fuel/assets/sounds` to `san_andreas_sound/web/sounds`.
+3. [Download and install San Andreas Sound Suite](https://drsnyder-fivem-site.pages.dev/scripts/san-andreas-sound-suite). The included `drs_*.ogg` sounds are served directly from ox_fuel and need no extra copying. Alternate sound providers may require installing the clips into their own sound folder. Sound sources and licenses are listed in `THIRD_PARTY_NOTICES.md`.
 4. Review prices, pump locations, EV models, vehicle profiles, and payment settings in `config.lua`.
 5. Add the portable charger item from `install/ox_inventory_items.lua` to `ox_inventory/data/items.lua`.
 6. Copy `install/images/portable_ev_charger_compact.png` to `ox_inventory/web/images`.
@@ -49,6 +52,8 @@ ensure ox_fuel
 
 The first move from an older build that streamed the electric assets inside `ox_fuel` requires a full server restart. After that, `ox_fuel` can be restarted while `ox_fuel_assets` stays mounted. Stop or update the companion resource only during a full server restart.
 
+The DRS model-name migration also requires a full server/client restart. Do not hot-restart the companion. Legacy CDN charging models and charging-only sounds are no longer included; gas sounds and their attribution remain.
+
 ## Configuration
 
 The main settings are grouped in `config.lua`:
@@ -61,6 +66,7 @@ The main settings are grouped in `config.lua`:
 | `pumpOccupancy` | Dual-nozzle slots, single-model exclusions, shared flow speed, leases, and heartbeat timing |
 | `fuelMeter` | Units, checkout method, logos, themes, and UI behavior |
 | `nozzle` | Fuel nozzle, hose, sounds, attachment, anchors, and debug tools |
+| `ronPump` | Style-A RON replacement, physical registers, docks, illumination, and damage locations |
 | `electric` | EV models, stations, charging modes, connector, cable, and blips |
 | `electric.portable` | Portable pack item, capacity, prop, cable, purchase, and warnings |
 | `customGasPumpLocations` | Spawned aircraft, marine, and remote pumps |
@@ -69,7 +75,13 @@ The main settings are grouped in `config.lua`:
 
 Fuel remains stored as a `0` to `100` vehicle state value for ox_fuel compatibility. Gallons, kWh, price, premium blend, and portable pack charge are calculated and validated by the server.
 
+Sentinel sessions use the physical cabinet screen only. Choose options with the arrow keys, confirm with Enter, or cancel with Backspace. Ordinary gas pumps and portable power keep their screen HUDs. `electric.stationDisplay.hudFallback = true` optionally restores the distance/readability fallback. EV clips and volumes are configurable in `electric.sounds`.
+
+`ronPump.enabled = true` replaces nearby map RON `prop_gas_pump_1a` props with the original `drs_gas_pump_ron`, inheriting their base position and heading. It hides/restores map props rather than deleting them; script-owned custom pumps and other brands are untouched. Set it to `false` and restart only ox_fuel to restore the stock pumps while the asset companion stays mounted. RON checkout/live totals use its physical register by default, with the same arrow/Enter/Backspace controls as Sentinel. Docks, lights, display, and placement corrections are grouped under `ronPump`. Damage synchronization validates listed station/custom-pump coordinates; add unlisted MLO pump coordinates to `ronPump.damageLocations` for synchronized destruction.
+
 Each pump normally exposes two independently synchronized handles. `prop_vintage_pump` remains single-handle through `pumpOccupancy.singleNozzleModels`. When both slots are actively transferring fuel or energy, both sessions use `pumpOccupancy.sharedFlowMultiplier`; holding an unused nozzle does not reduce the other side's speed.
+
+The replacement RON pump chooses its front/rear register from the player's approach side, regardless of the leased nozzle slot (`ronPump.stationDisplay.useApproachSide`).
 
 The version checker runs once at server startup and prints only when a newer package is available unless `notifyCurrent` or `verboseErrors` is enabled. Set `versionCheck.enabled = false` to disable it. Each public update must also bump `version` in `ox_fuel/fxmanifest.lua` on GitHub.
 
@@ -119,6 +131,20 @@ Keep `stack = false` so each unit retains independent charge metadata.
 
 ## Local Changes From Original
 
+- Universal `drs_fuel_nozzle` replaces the runtime stock fuel nozzle on all brands, vintage units, and custom pumps, including the visible RON docks. Its original geometry retains the existing hand/vehicle frame and hose exit; tuned offsets, sounds, and transfer behavior are unchanged. Install the matching `ox_fuel_assets` 1.2.6 companion during a full server/client restart, never a live companion restart. `nozzle.model` remains configurable.
+- Compact 13-file audio bank: dry recorded handling cues and shared connector/relay sounds replace the synthesized sweeps. Gas, station EV, and portable loops are unchanged. Holder/vehicle/device emitters and short one-shot ranges follow the physical action; gas completion has no extra chime. Unused legacy sounds are removed, with historical credits retained. Install the matching config, client scripts, and complete sound folder together.
+- RON cabinet/control refinement: near-flush fascia and aligned live screens, continuous rounded amber trim, outward-angled front/rear underside diffusers, no white header edge, softly backlit grade faces/keypad legends, and a cosmetic model-only Diesel button. Accepted dimensions, docks, collision, sound, checkout choices, and Sentinel assets are unchanged.
+- Fuel hoses and EV cables use rope natives only; their handles are no longer passed to the entity-only `ActivatePhysics` native. Attachment, offsets, and cleanup behavior are unchanged.
+- RON uses model-native night illumination; `ronPump.lighting.enabled` remains false so its former scripted hotspots do not render. Two short-range, non-shadowed underside lights replace the original central emitter; Sentinel lighting is unchanged.
+- RON side badges are raised clear of the docked nozzles; gray lower-panel screw/lock details are removed. The physical register has slightly more depth clearance and larger transaction labels.
+- Sentinel docked connectors are recessed 3 cm with matching parked cable ends. Emissive accents are stronger; nearby night spill uses distributed strip samples, limited to the two closest cabinets with a distance fade.
+- Original-size RON polish: inward-facing docked nozzles, fitted holders, transparent side badges, and raised/recessed controls. Gas and EV keyboard selection includes a highlighted Confirm row.
+- Resource-local gas/EV cues keep configurable volumes and stable managed-loop cleanup; shared filenames do not merge independent station/portable sound IDs.
+- RON cabinet spawning extends to 140 m with 180 m exit hysteresis and the existing 12-pump cap. RON/Sentinel low-detail visibility extends to 180 m; near-detail LODs, docks, lighting, and live-screen ranges stay bounded. Tune `ronPump.spawnDistance`, `despawnDistance`, `modelLodDistance`, and `electric.modelLodDistance` for the server's hardware.
+- On approach, map RON replacements still wait for GTA's original prop to stream in. The 140 m spawn range is a ceiling, not a forced map-streaming distance; already spawned replacements remain visible farther when departing.
+
+- RON physical-screen checkout rows reserve space for grade, price, payment, and confirmation without overlap; the original-size replacement model and offsets are retained.
+
 Compared with CommunityOx ox_fuel v1.5.2, this build adds:
 
 - Physical nozzle, hose, connector, and cable systems.
@@ -130,6 +156,10 @@ Compared with CommunityOx ox_fuel v1.5.2, this build adds:
 - Spawned custom pumps and EV stations with synchronized damage behavior.
 - Portable EV power with a compact vertical battery display, item metadata, purchase, deployment, charging, damage, and recharge flows.
 - Persistent electric assets through the `ox_fuel_assets` companion.
+- Original `drs_ev_*` Sentinel station/portable models, faceted open-grip connector, docked cables, synchronized pickup, softly illuminated trim/labels, and cabinet-only station UI (beta only).
+- Sentinel station uses separate static type/include collision masks covering vehicle bodies, wheels, and pedestrians; scripted electrical damage remains independent of physical collision.
+- Configurable, reversible RON map-pump replacement with original emissive logo/trim materials, dual docked universal nozzles, shaped idle hoses, independent front/rear registers, vehicle/wheel collision, and synchronized scripted damage at validated station locations.
+- Shared dry EV interaction cues, separate station/portable managed loops, and resource-local playback through San Andreas Sound.
 - Optional, disabled-by-default Chaos Mode.
 - Maintained-repository startup version checking.
 
@@ -142,7 +172,8 @@ Before using the resource on a live server, test representative gas vehicles, EV
 This project is distributed under GPL-3.0. See `LICENSE` and `THIRD_PARTY_NOTICES.md` before redistribution.
 
 - Base resource: [CommunityOx ox_fuel](https://github.com/CommunityOx/ox_fuel)
-- Electric models and selected sounds: [CDN-Fuel](https://github.com/CodineDev/cdn-fuel)
+- Selected gas sounds: [CDN-Fuel](https://github.com/CodineDev/cdn-fuel)
+- Original DRS Sentinel models, preserved loops, and device tones: ox_fuel Expanded contributors. Recorded foley sources and their licenses are credited in `THIRD_PARTY_NOTICES.md`.
 - Adapted vehicle offsets and station data: [LC Fuel](https://github.com/LeonardoSoares98/lc_fuel)
 
 Free and source-available does not mean public domain. Keep the license, notices, and attribution with modified or redistributed copies.

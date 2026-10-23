@@ -2,10 +2,10 @@ local config = require 'config'
 local fuelGrades = require 'fuel_grades'
 local vehicleProfiles = require 'vehicle_profiles'
 local electricProfiles = require 'electric_profiles'
+local pumpSlots = require 'pump_slots'
+local pumpFlow = require 'pump_flow'
 
 if not config then return end
-
-if config.versionCheck then lib.versionCheck('communityox/ox_fuel') end
 
 local ox_inventory = exports.ox_inventory
 local fuelingSettings = config.fueling or {}
@@ -284,6 +284,9 @@ end
 
 local function soundUrl(sound, sourceSettings)
 	if sound.url then return sound.url end
+	if sourceSettings.localResourceSounds == true then
+		return ('https://cfx-nui-%s/assets/sounds/%s.ogg'):format(GetCurrentResourceName(), sound.name)
+	end
 
 	local baseUrl = sourceSettings.soundBaseUrl or 'https://cfx-nui-san_andreas_sound/web/sounds/%s.ogg'
 
@@ -306,6 +309,7 @@ local pumpLeaseCounter = 0
 local allowedPumpModels = {}
 local gasPumpModels = {}
 local destroyedChargers = {}
+local destroyedRonPumps = {}
 
 for i = 1, #config.pumpModels do
 	allowedPumpModels[tostring(config.pumpModels[i])] = true
@@ -350,16 +354,19 @@ local function getPumpKey(model, position)
 		if not index or destroyedChargers[index] then return end
 	end
 
-	return ('%s:%s:%s:%s'):format(
+	local key = ('%s:%s:%s:%s'):format(
 		model,
 		quantizeCoordinate(position.x),
 		quantizeCoordinate(position.y),
 		quantizeCoordinate(position.z)
 	)
+	if destroyedRonPumps[key] then return end
+	return key
 end
 
 local function broadcastPumpLease(key, owner)
-	TriggerClientEvent('ox_fuel:pumpOccupancyChanged', -1, key, owner or false)
+	local lease = pumpLeases[key]
+	TriggerClientEvent('ox_fuel:pumpOccupancyChanged', -1, key, owner or false, lease and lease.connectorTaken == true or false)
 end
 
 local function releasePumpLease(key, playerId, token)
@@ -373,6 +380,18 @@ local function releasePumpLease(key, playerId, token)
 	broadcastPumpLease(key)
 
 	return true
+end
+
+local function releasePumpGroup(pumpKey)
+	local keys = {}
+
+	for key, lease in pairs(pumpLeases) do
+		if lease.pumpKey == pumpKey then keys[#keys + 1] = key end
+	end
+
+	for index = 1, #keys do
+		releasePumpLease(keys[index])
+	end
 end
 
 local function releasePlayerPumps(playerId)
@@ -402,6 +421,91 @@ local function clearExpiredPumpLeases()
 	for i = 1, #keys do
 		releasePumpLease(keys[i])
 	end
+end
+
+local function getPumpSlotOrder(slotCount, preferredSlot)
+	local order = {}
+	preferredSlot = math.floor(tonumber(preferredSlot) or 1)
+
+	if preferredSlot < 1 or preferredSlot > slotCount then preferredSlot = 1 end
+
+	order[1] = preferredSlot
+
+	for slot = 1, slotCount do
+		if slot ~= preferredSlot then order[#order + 1] = slot end
+	end
+
+	return order
+end
+
+local function acquirePumpSlot(playerId, model, position, preferredSlot, leaseDuration, token)
+	local pumpKey = getPumpKey(model, position)
+
+	if not pumpKey then return end
+
+	clearExpiredPumpLeases()
+
+	model = math.floor(tonumber(model))
+	local slotCount = pumpSlots.getSlotCount(occupancySettings, model)
+	local slotOrder = getPumpSlotOrder(slotCount, preferredSlot)
+	local now = GetGameTimer()
+
+	for slot = 1, slotCount do
+		local key = pumpSlots.getLeaseKey(pumpKey, slot)
+		local lease = pumpLeases[key]
+
+		if lease and lease.owner == playerId then
+			lease.expiresAt = now + leaseDuration
+			lease.position = position
+			lease.model = model
+
+			if token then lease.token = token end
+
+			return lease, key
+		end
+	end
+
+	for index = 1, #slotOrder do
+		local slot = slotOrder[index]
+		local key = pumpSlots.getLeaseKey(pumpKey, slot)
+
+		if not pumpLeases[key] then
+			if not token then
+				pumpLeaseCounter = pumpLeaseCounter + 1
+				token = ('%s:%s'):format(playerId, pumpLeaseCounter)
+			end
+
+			local lease = {
+				owner = playerId,
+				token = token,
+				expiresAt = now + leaseDuration,
+				position = position,
+				model = model,
+				pumpKey = pumpKey,
+				slot = slot,
+				slotCount = slotCount,
+			}
+
+			pumpLeases[key] = lease
+			broadcastPumpLease(key, playerId)
+
+			return lease, key
+		end
+	end
+end
+
+local function hasAvailablePumpSlot(playerId, pumpKey, model)
+	clearExpiredPumpLeases()
+
+	local slotCount = pumpSlots.getSlotCount(occupancySettings, model)
+
+	for slot = 1, slotCount do
+		local lease = pumpLeases[pumpSlots.getLeaseKey(pumpKey, slot)]
+
+		if not lease or lease.owner == playerId then return true end
+	end
+
+	return false
 end
 
 local function getPlayerActivePumpLease(playerId, model)
@@ -435,13 +539,33 @@ lib.callback.register('ox_fuel:getPumpOccupancy', function()
 
 	clearExpiredPumpLeases()
 
-	local occupied = {}
+	local occupied, connectors = {}, {}
 
 	for key, lease in pairs(pumpLeases) do
 		occupied[key] = lease.owner
+		if lease.connectorTaken then connectors[key] = true end
 	end
 
-	return occupied
+	return occupied, connectors
+end)
+
+RegisterNetEvent('ox_fuel:chargerConnectorTaken', function(key, token, taken)
+	if type(key) ~= 'string' or type(taken) ~= 'boolean' then return end
+	local lease = pumpLeases[key]
+	if not pumpSlots.canSetConnectorTaken(lease, source, token, electricSettings.chargerModel, GetGameTimer()) then return end
+	if (lease.connectorTaken == true) == taken then return end
+	lease.connectorTaken = taken
+	broadcastPumpLease(key, lease.owner)
+end)
+
+RegisterNetEvent('ox_fuel:pumpNozzleTaken', function(key, token, taken)
+	local ron = config.ronPump or {}
+	if ron.enabled ~= true or type(key) ~= 'string' or type(taken) ~= 'boolean' then return end
+	local lease = pumpLeases[key]
+	if not pumpSlots.canSetConnectorTaken(lease, source, token, ron.model, GetGameTimer()) then return end
+	if (lease.connectorTaken == true) == taken then return end
+	lease.connectorTaken = taken
+	broadcastPumpLease(key, lease.owner)
 end)
 
 lib.callback.register('ox_fuel:acquirePump', function(source, model, payload)
@@ -453,44 +577,20 @@ lib.callback.register('ox_fuel:acquirePump', function(source, model, payload)
 
 	if not position or not playerPos or distanceBetween(playerPos, position) > maxDistance then return end
 
-	local key = getPumpKey(model, position)
-
-	if not key then return end
-
-	local now = GetGameTimer()
-	local lease = pumpLeases[key]
-
-	if lease and now > lease.expiresAt then
-		releasePumpLease(key)
-		lease = nil
-	end
-
 	local leaseDuration = math.max(tonumber(occupancySettings.leaseDurationMs) or 15000, 3000)
+	local preferredSlot = type(payload) == 'table' and payload.slot or nil
+	local lease, key = acquirePumpSlot(source, model, position, preferredSlot, leaseDuration)
 
-	if lease then
-		if lease.owner ~= source then return end
+	if not lease then return end
 
-		pumpLeaseCounter = pumpLeaseCounter + 1
-		lease.token = ('%s:%s'):format(source, pumpLeaseCounter)
-		lease.expiresAt = now + leaseDuration
-		lease.position = position
-		lease.model = math.floor(tonumber(model))
-
-		return { key = key, token = lease.token, owner = source }
-	end
-
-	pumpLeaseCounter = pumpLeaseCounter + 1
-	lease = {
+	return {
+		key = key,
+		pumpKey = lease.pumpKey,
+		token = lease.token,
 		owner = source,
-		token = ('%s:%s'):format(source, pumpLeaseCounter),
-		expiresAt = now + leaseDuration,
-		position = position,
-		model = math.floor(tonumber(model)),
+		slot = lease.slot,
+		slotCount = lease.slotCount,
 	}
-	pumpLeases[key] = lease
-	broadcastPumpLease(key, source)
-
-	return { key = key, token = lease.token, owner = source }
 end)
 
 RegisterNetEvent('ox_fuel:heartbeatPump', function(key, token)
@@ -544,7 +644,7 @@ local function markCustomPumpDestroyed(index, origin)
 
 	local pumpKey = getPumpKey(model, location)
 
-	if pumpKey then releasePumpLease(pumpKey) end
+	if pumpKey then releasePumpGroup(pumpKey) end
 
 	TriggerClientEvent('ox_fuel:explodeCustomPump', -1, index, origin or 0)
 
@@ -575,6 +675,48 @@ RegisterNetEvent('ox_fuel:customPumpDestroyed', function(index)
 	if not damageable or not location or not position or distanceBetween(position, location) > reportDistance then return end
 
 	markCustomPumpDestroyed(index, source)
+end)
+
+local ronStationPumps = config.ronPump and config.ronPump.enabled == true and lib.load('data.stations') or {}
+local ronReportTimes = {}
+local function isKnownRonPosition(position)
+	for _, location in ipairs((config.ronPump or {}).damageLocations or {}) do
+		if distanceBetween(position, location) <= 3.0 then return true end
+	end
+	for _, station in pairs(ronStationPumps) do
+		for i = 1, #station do
+			if distanceBetween(position, station[i]) <= 3.0 then return true end
+		end
+	end
+	for i = 1, #(config.customGasPumpLocations or {}) do
+		local entry = config.customGasPumpLocations[i]
+		local model = type(entry.prop) == 'string' and joaat(entry.prop) or entry.prop
+		if model == (config.ronPump or {}).model and distanceBetween(position, entry.location or entry) <= 3.0 then return true end
+	end
+	return false
+end
+
+lib.callback.register('ox_fuel:getDestroyedRonPumps', function() return destroyedRonPumps end)
+RegisterNetEvent('ox_fuel:ronPumpDestroyed', function(payload)
+	local ron = config.ronPump or {}
+	if ron.enabled ~= true or ron.damageable == false or customPumpPropSettings.synchronizeExplosions == false then return end
+	local position = positionFromPayload(payload)
+	local player = playerPosition(source)
+	local now = GetGameTimer()
+	if position then
+		for _, field in ipairs({ 'x', 'y', 'z' }) do
+			local value = position[field]
+			if value ~= value or math.abs(value) > 20000 then return end
+		end
+	end
+	if not position or not player or distanceBetween(position, player) > (tonumber(ron.reportDistance) or 50)
+		or not isKnownRonPosition(position) or now - (ronReportTimes[source] or -2000) < 1000 then return end
+	local key = getPumpKey(ron.model, position)
+	if not key then return end
+	ronReportTimes[source] = now
+	destroyedRonPumps[key] = position
+	releasePumpGroup(key)
+	TriggerClientEvent('ox_fuel:ronPumpDestroyed', -1, key, position, source)
 end)
 
 lib.callback.register('ox_fuel:getDestroyedChargers', function()
@@ -610,7 +752,7 @@ RegisterNetEvent('ox_fuel:chargerDestroyed', function(index)
 	local pumpKey = getPumpKey(electricSettings.chargerModel, location)
 	destroyedChargers[index] = true
 
-	if pumpKey then releasePumpLease(pumpKey) end
+	if pumpKey then releasePumpGroup(pumpKey) end
 
 	TriggerClientEvent('ox_fuel:destroyCharger', -1, index, source)
 end)
@@ -638,6 +780,75 @@ local fuelingSessionCounter = 0
 local chargingSessionCounter = 0
 local portableSessionCounter = 0
 local chaosCooldowns = {}
+
+local function getMinimumPumpFlowMultiplier(lease)
+	if not lease or (lease.slotCount or 1) <= 1 then return 1 end
+
+	return pumpSlots.getSharedFlowMultiplier(occupancySettings)
+end
+
+local function getPumpFlowSessions(pumpKey)
+	local sessions = {}
+	local collections = {
+		fuelingSessions,
+		chargingSessions,
+		portableRechargeSessions,
+	}
+
+	for collectionIndex = 1, #collections do
+		for playerId, session in pairs(collections[collectionIndex]) do
+			if session.pumpGroupKey == pumpKey then
+				sessions[#sessions + 1] = {
+					playerId = playerId,
+					session = session,
+				}
+			end
+		end
+	end
+
+	return sessions
+end
+
+local function refreshPumpFlow(pumpKey)
+	if not pumpKey then return end
+
+	local sessions = getPumpFlowSessions(pumpKey)
+	local multiplier = #sessions > 1 and pumpSlots.getSharedFlowMultiplier(occupancySettings) or 1
+	local refillTick = math.max(tonumber(config.refillTick) or 0, 1)
+	local now = GetGameTimer()
+
+	for index = 1, #sessions do
+		local entry = sessions[index]
+		local session = entry.session
+		local amountPerTick = math.max(tonumber(session.baseFlowPerTick) or 0, 0) * multiplier
+		local startTick = session.flowInitialized == false and 1 or nil
+		local _, changed = pumpFlow.setRate(session, now, refillTick, amountPerTick, startTick)
+
+		session.flowMultiplier = multiplier
+		session.flowInitialized = true
+
+		if changed then
+			TriggerClientEvent('ox_fuel:pumpFlowChanged', entry.playerId, {
+				sessionId = session.id,
+				sessionType = session.flowType,
+				amountPerTick = amountPerTick,
+				multiplier = multiplier,
+			})
+		end
+	end
+end
+
+local function removePumpFlowSession(collection, playerId, sessionId)
+	local session = collection[playerId]
+
+	if not session or sessionId and session.id ~= sessionId then return end
+
+	collection[playerId] = nil
+
+	if session.pumpGroupKey then refreshPumpFlow(session.pumpGroupKey) end
+
+	return session
+end
 
 local function getChaosFeature(name)
 	local feature = chaosSettings[name]
@@ -1246,10 +1457,12 @@ lib.callback.register('ox_fuel:startFueling', function(source, netId, isPump, re
 
 	if vintageQuirk and vintageQuirk.type == 'slow_flow' then
 		volumePerTick = volumePerTick * vintageQuirk.flowMultiplier
-		maxTicks = math.ceil(maxVolume / volumePerTick)
 	elseif vintageQuirk and not vintageQuirk.triggerTick then
 		vintageQuirk = nil
 	end
+
+	local minimumFlowMultiplier = getMinimumPumpFlowMultiplier(sourceLease)
+	maxTicks = pumpFlow.getMaxTicks(maxVolume, volumePerTick, minimumFlowMultiplier)
 
 	fuelingSessionCounter = fuelingSessionCounter + 1
 
@@ -1269,7 +1482,14 @@ lib.callback.register('ox_fuel:startFueling', function(source, netId, isPump, re
 		maxTicks = maxTicks,
 		maxVolume = maxVolume,
 		tankCapacityGallons = tankCapacityGallons,
-		volumePerTick = volumePerTick,
+		baseFlowPerTick = volumePerTick,
+		flowPerTick = volumePerTick,
+		flowMultiplier = 1,
+		flowInitialized = false,
+		flowSegments = {
+			{ startTick = 1, amountPerTick = volumePerTick },
+		},
+		flowType = 'fuel',
 		pricePerGallon = pricePerGallon,
 		paymentId = payment and payment.id or nil,
 		sourcePremiumRatio = sourcePremiumRatio,
@@ -1280,6 +1500,7 @@ lib.callback.register('ox_fuel:startFueling', function(source, netId, isPump, re
 		paymentShortLabel = payment and payment.shortLabel or nil,
 		petrolCanSlot = petrolCanSlot,
 		pumpKey = sourceKey,
+		pumpGroupKey = sourceLease and sourceLease.pumpKey or nil,
 		pumpToken = sourceLease and sourceLease.token or nil,
 		sourceMaxDistance = sourceReach,
 		startedAt = startedAt,
@@ -1290,6 +1511,7 @@ lib.callback.register('ox_fuel:startFueling', function(source, netId, isPump, re
 	}
 
 	fuelingSessions[source] = session
+	refreshPumpFlow(session.pumpGroupKey)
 
 	return {
 		id = sessionId,
@@ -1297,7 +1519,8 @@ lib.callback.register('ox_fuel:startFueling', function(source, netId, isPump, re
 		maxTicks = maxTicks,
 		maxVolume = maxVolume,
 		tankCapacityGallons = tankCapacityGallons,
-		volumePerTick = volumePerTick,
+		volumePerTick = session.flowPerTick,
+		flowMultiplier = session.flowMultiplier,
 		pricePerGallon = pricePerGallon,
 		availableFunds = availableFunds,
 		gradeId = grade.id,
@@ -1359,7 +1582,7 @@ lib.callback.register('ox_fuel:chaosDriveOff', function(source, netId, customPum
 		local customPumpKey = location and model and getPumpKey(model, location) or nil
 
 		if damageable
-			and customPumpKey == session.pumpKey
+			and customPumpKey == session.pumpGroupKey
 			and not destroyedCustomPumps[customPumpIndex]
 			and customPumpPropSettings.synchronizeExplosions ~= false
 			and rollChaos(feature.pumpDamageChance)
@@ -1385,7 +1608,7 @@ lib.callback.register('ox_fuel:finishFueling', function(source, sessionId, reque
 
 	if not session or session.id ~= sessionId then return end
 
-	fuelingSessions[source] = nil
+	removePumpFlowSession(fuelingSessions, source, sessionId)
 
 	local now = GetGameTimer()
 
@@ -1429,7 +1652,11 @@ lib.callback.register('ox_fuel:finishFueling', function(source, sessionId, reque
 	if completedTicks <= 0 then return end
 
 	local availableVolume = session.tankCapacityGallons * ((100 - currentFuel) / 100)
-	local transferredVolume = math.min(completedTicks * session.volumePerTick, session.maxVolume, availableVolume)
+	local transferredVolume = math.min(
+		pumpFlow.getTransferredAmount(session, completedTicks),
+		session.maxVolume,
+		availableVolume
+	)
 
 	if transferredVolume <= 0.0001 then return end
 
@@ -1513,11 +1740,7 @@ lib.callback.register('ox_fuel:finishFueling', function(source, sessionId, reque
 end)
 
 RegisterNetEvent('ox_fuel:cancelFueling', function(sessionId)
-	local session = fuelingSessions[source]
-
-	if session and session.id == sessionId then
-		fuelingSessions[source] = nil
-	end
+	removePumpFlowSession(fuelingSessions, source, sessionId)
 end)
 
 local function getChargingMode(modeId)
@@ -1667,7 +1890,8 @@ lib.callback.register('ox_fuel:startCharging', function(source, netId, reportedF
 		maxEnergy = math.min(maxEnergy, payment.balance / mode.pricePerKwh)
 	end
 
-	local maxTicks = math.ceil(maxEnergy / energyPerTick)
+	local minimumFlowMultiplier = getMinimumPumpFlowMultiplier(chargerLease)
+	local maxTicks = pumpFlow.getMaxTicks(maxEnergy, energyPerTick, minimumFlowMultiplier)
 
 	if maxTicks <= 0 then return end
 
@@ -1683,7 +1907,14 @@ lib.callback.register('ox_fuel:startCharging', function(source, netId, reportedF
 		netId = validatedNetId,
 		startFuel = fuel,
 		batteryCapacityKwh = batteryCapacityKwh,
-		energyPerTick = energyPerTick,
+		baseFlowPerTick = energyPerTick,
+		flowPerTick = energyPerTick,
+		flowMultiplier = 1,
+		flowInitialized = false,
+		flowSegments = {
+			{ startTick = 1, amountPerTick = energyPerTick },
+		},
+		flowType = 'charge',
 		maxEnergy = maxEnergy,
 		maxTicks = maxTicks,
 		pricePerKwh = mode.pricePerKwh,
@@ -1694,6 +1925,7 @@ lib.callback.register('ox_fuel:startCharging', function(source, netId, reportedF
 		paymentLabel = payment.label,
 		paymentShortLabel = payment.shortLabel,
 		pumpKey = chargerKey,
+		pumpGroupKey = chargerLease.pumpKey,
 		pumpToken = chargerLease.token,
 		sourceMaxDistance = sourceReach,
 		startedAt = startedAt,
@@ -1707,12 +1939,14 @@ lib.callback.register('ox_fuel:startCharging', function(source, netId, reportedF
 	end
 
 	chargingSessions[source] = session
+	refreshPumpFlow(session.pumpGroupKey)
 
 	return {
 		id = sessionId,
 		fuel = fuel,
 		batteryCapacityKwh = batteryCapacityKwh,
-		energyPerTick = energyPerTick,
+		energyPerTick = session.flowPerTick,
+		flowMultiplier = session.flowMultiplier,
 		maxEnergy = maxEnergy,
 		maxTicks = maxTicks,
 		pricePerKwh = mode.pricePerKwh,
@@ -1733,7 +1967,7 @@ lib.callback.register('ox_fuel:finishCharging', function(source, sessionId, requ
 
 	if not session or session.id ~= sessionId then return end
 
-	chargingSessions[source] = nil
+	removePumpFlowSession(chargingSessions, source, sessionId)
 
 	local now = GetGameTimer()
 
@@ -1786,7 +2020,11 @@ lib.callback.register('ox_fuel:finishCharging', function(source, sessionId, requ
 	if not currentFuel then return end
 
 	local availableEnergy = session.batteryCapacityKwh * ((100 - currentFuel) / 100)
-	local transferredEnergy = math.min(completedTicks * session.energyPerTick, session.maxEnergy, availableEnergy)
+	local transferredEnergy = math.min(
+		pumpFlow.getTransferredAmount(session, completedTicks),
+		session.maxEnergy,
+		availableEnergy
+	)
 
 	if transferredEnergy <= 0.0001 then return end
 
@@ -1822,11 +2060,7 @@ lib.callback.register('ox_fuel:finishCharging', function(source, sessionId, requ
 end)
 
 RegisterNetEvent('ox_fuel:cancelCharging', function(sessionId)
-	local session = chargingSessions[source]
-
-	if session and session.id == sessionId then
-		chargingSessions[source] = nil
-	end
+	removePumpFlowSession(chargingSessions, source, sessionId)
 end)
 
 local function getPortableDeployment(playerId, token)
@@ -1873,7 +2107,7 @@ lib.callback.register('ox_fuel:damagePortableCharger', function(source, token)
 	end
 
 	portableChargingSessions[source] = nil
-	portableRechargeSessions[source] = nil
+	removePumpFlowSession(portableRechargeSessions, source)
 	writePortableMetadata(source, deployment, 0, deployment.token)
 
 	return {
@@ -2104,17 +2338,25 @@ lib.callback.register('ox_fuel:startPortableRecharge', function(source, token, c
 
 	if mode.pricePerKwh > 0 then maxEnergy = math.min(maxEnergy, payment.balance / mode.pricePerKwh) end
 
-	local maxTicks = math.ceil(maxEnergy / energyPerTick)
+	local minimumFlowMultiplier = getMinimumPumpFlowMultiplier(chargerLease)
+	local maxTicks = pumpFlow.getMaxTicks(maxEnergy, energyPerTick, minimumFlowMultiplier)
 	local startedAt = GetGameTimer()
 	local graceMs = math.max(tonumber(validation.sessionGraceMs) or 10000, 0)
 	portableSessionCounter = portableSessionCounter + 1
 
 	local sessionId = ('%s:portable-refill:%s'):format(source, portableSessionCounter)
 
-	portableRechargeSessions[source] = {
+	local session = {
 		id = sessionId,
 		deploymentToken = token,
-		energyPerTick = energyPerTick,
+		baseFlowPerTick = energyPerTick,
+		flowPerTick = energyPerTick,
+		flowMultiplier = 1,
+		flowInitialized = false,
+		flowSegments = {
+			{ startTick = 1, amountPerTick = energyPerTick },
+		},
+		flowType = 'portable-recharge',
 		maxEnergy = maxEnergy,
 		maxTicks = maxTicks,
 		pricePerKwh = mode.pricePerKwh,
@@ -2125,17 +2367,21 @@ lib.callback.register('ox_fuel:startPortableRecharge', function(source, token, c
 		paymentLabel = payment.label,
 		paymentShortLabel = payment.shortLabel,
 		pumpKey = chargerKey,
+		pumpGroupKey = chargerLease and chargerLease.pumpKey or nil,
 		pumpToken = chargerLease and chargerLease.token or nil,
 		sourcePosition = chargerPosition,
 		startedAt = startedAt,
 		expiresAt = startedAt + (maxTicks * refillTick) + graceMs,
 	}
+	portableRechargeSessions[source] = session
+	refreshPumpFlow(session.pumpGroupKey)
 
 	return {
 		id = sessionId,
 		packChargeKwh = packCharge,
 		packCapacityKwh = packCapacity,
-		energyPerTick = energyPerTick,
+		energyPerTick = session.flowPerTick,
+		flowMultiplier = session.flowMultiplier,
 		maxEnergy = maxEnergy,
 		maxTicks = maxTicks,
 		pricePerKwh = mode.pricePerKwh,
@@ -2154,7 +2400,7 @@ lib.callback.register('ox_fuel:finishPortableRecharge', function(source, session
 	local session = portableRechargeSessions[source]
 
 	if not session or session.id ~= sessionId then return end
-	portableRechargeSessions[source] = nil
+	removePumpFlowSession(portableRechargeSessions, source, sessionId)
 
 	local now = GetGameTimer()
 	local deployment, _, packCharge, packCapacity = getPortableDeployment(source, session.deploymentToken)
@@ -2190,7 +2436,11 @@ lib.callback.register('ox_fuel:finishPortableRecharge', function(source, session
 	local elapsedTicks = math.floor((now - session.startedAt) / refillTick) + 1 + tickTolerance
 	local completedTicks = math.min(requestedTicks, elapsedTicks, session.maxTicks)
 	local availableSpace = packCapacity - packCharge
-	local transferredEnergy = math.min(completedTicks * session.energyPerTick, session.maxEnergy, availableSpace)
+	local transferredEnergy = math.min(
+		pumpFlow.getTransferredAmount(session, completedTicks),
+		session.maxEnergy,
+		availableSpace
+	)
 
 	if transferredEnergy <= 0.0001 then return end
 
@@ -2220,15 +2470,13 @@ lib.callback.register('ox_fuel:finishPortableRecharge', function(source, session
 end)
 
 RegisterNetEvent('ox_fuel:cancelPortableRecharge', function(sessionId)
-	local session = portableRechargeSessions[source]
-
-	if session and session.id == sessionId then portableRechargeSessions[source] = nil end
+	removePumpFlowSession(portableRechargeSessions, source, sessionId)
 end)
 
 local fuelCanSessionCounter = 0
 
 local function validateFuelCanPump(playerId, model, payload)
-	if model == nil and payload == nil then return true end
+	if model == nil and payload == nil then return nil, nil, nil, true end
 
 	local position = positionFromPayload(payload)
 	local playerPos = playerPosition(playerId)
@@ -2236,12 +2484,9 @@ local function validateFuelCanPump(playerId, model, payload)
 	local key = position and getPumpKey(model, position) or nil
 
 	if not key or not playerPos or distanceBetween(playerPos, position) > maxDistance then return end
+	if occupancySettings.enabled ~= false and not hasAvailablePumpSlot(playerId, key, model) then return end
 
-	local lease = pumpLeases[key]
-
-	if lease and lease.owner ~= playerId and GetGameTimer() <= lease.expiresAt then return end
-
-	return key
+	return key, position, math.floor(tonumber(model)), true
 end
 
 local function clearPortablePurchaseSession(playerId, sessionId)
@@ -2265,9 +2510,9 @@ lib.callback.register('ox_fuel:preparePortablePurchase', function(source, paymen
 		or hasActiveSession(source)
 	then return end
 
-	local pumpKey = validateFuelCanPump(source, chargerModel, chargerPayload)
+	local pumpGroupKey, pumpPosition, validatedPumpModel = validateFuelCanPump(source, chargerModel, chargerPayload)
 
-	if not pumpKey or tonumber(chargerModel) ~= tonumber(electricSettings.chargerModel) then return end
+	if not pumpGroupKey or tonumber(chargerModel) ~= tonumber(electricSettings.chargerModel) then return end
 	if not ox_inventory:CanCarryItem(source, portableItemName(), 1) then
 		notifyPlayer(source, locale('portable_cannot_carry'))
 		return
@@ -2292,17 +2537,25 @@ lib.callback.register('ox_fuel:preparePortablePurchase', function(source, paymen
 
 	local sessionId = ('%s:portable-purchase:%s'):format(source, portableSessionCounter)
 	local pumpToken
+	local pumpKey = pumpGroupKey
 
 	if occupancySettings.enabled ~= false then
 		pumpToken = sessionId
-		pumpLeases[pumpKey] = {
-			owner = source,
-			token = pumpToken,
-			model = tonumber(chargerModel),
-			position = positionFromPayload(chargerPayload),
-			expiresAt = startedAt + duration + graceMs,
-		}
-		broadcastPumpLease(pumpKey, source)
+		local lease, leaseKey = acquirePumpSlot(
+			source,
+			validatedPumpModel,
+			pumpPosition,
+			type(chargerPayload) == 'table' and chargerPayload.slot or nil,
+			duration + graceMs,
+			pumpToken
+		)
+
+		if not lease then
+			notifyPlayer(source, locale('pump_in_use'))
+			return
+		end
+
+		pumpKey = leaseKey
 	end
 
 	portablePurchaseSessions[source] = {
@@ -2404,9 +2657,9 @@ lib.callback.register('ox_fuel:prepareFuelCan', function(source, hasCan, gradeId
 
 	if type(hasCan) ~= 'boolean' then return end
 
-	local pumpKey = validateFuelCanPump(source, pumpModel, pumpPayload)
+	local pumpGroupKey, pumpPosition, validatedPumpModel, validPump = validateFuelCanPump(source, pumpModel, pumpPayload)
 
-	if (pumpModel ~= nil or pumpPayload ~= nil) and not pumpKey then
+	if not validPump then
 		notifyPlayer(source, locale('pump_in_use'))
 		return
 	end
@@ -2459,20 +2712,31 @@ lib.callback.register('ox_fuel:prepareFuelCan', function(source, hasCan, gradeId
 	local sessionId = ('can:%s:%s'):format(source, fuelCanSessionCounter)
 	local startedAt = GetGameTimer()
 	local pumpToken
+	local pumpKey = pumpGroupKey
 	local previousSession = fuelCanSessions[source]
 
 	if previousSession and previousSession.pumpKey then
 		releasePumpLease(previousSession.pumpKey, source, previousSession.pumpToken)
 	end
 
-	if pumpKey and occupancySettings.enabled ~= false then
+	if pumpGroupKey and occupancySettings.enabled ~= false then
 		pumpToken = sessionId
-		pumpLeases[pumpKey] = {
-			owner = source,
-			token = pumpToken,
-			expiresAt = startedAt + duration + math.max(tonumber(validation.sessionGraceMs) or 10000, 0),
-		}
-		broadcastPumpLease(pumpKey, source)
+		local graceMs = math.max(tonumber(validation.sessionGraceMs) or 10000, 0)
+		local lease, leaseKey = acquirePumpSlot(
+			source,
+			validatedPumpModel,
+			pumpPosition,
+			type(pumpPayload) == 'table' and pumpPayload.slot or nil,
+			duration + graceMs,
+			pumpToken
+		)
+
+		if not lease then
+			notifyPlayer(source, locale('pump_in_use'))
+			return
+		end
+
+		pumpKey = leaseKey
 	end
 
 	fuelCanSessions[source] = {
@@ -2513,6 +2777,7 @@ lib.callback.register('ox_fuel:prepareFuelCan', function(source, hasCan, gradeId
 		paymentLabel = payment.label,
 		paymentShortLabel = payment.shortLabel,
 		duration = duration,
+		pumpSlot = pumpLeases[pumpKey] and pumpLeases[pumpKey].slot or nil,
 	}
 end)
 
@@ -2531,7 +2796,9 @@ lib.callback.register('ox_fuel:finishFuelCan', function(source, sessionId)
 
 	if now > session.expiresAt or now < session.startedAt + session.duration - 750 then return end
 
-	if not validateFuelCanPump(source, session.pumpModel, session.pumpPayload) then return end
+	local _, _, _, validPump = validateFuelCanPump(source, session.pumpModel, session.pumpPayload)
+
+	if not validPump then return end
 
 	local item
 
@@ -2724,15 +2991,16 @@ RegisterNetEvent('ox_fuel:stopSound', function(soundName, payload)
 end)
 
 AddEventHandler('playerDropped', function()
+	ronReportTimes[source] = nil
 	destroyPlayerSounds(source)
+	removePumpFlowSession(fuelingSessions, source)
+	removePumpFlowSession(chargingSessions, source)
+	removePumpFlowSession(portableRechargeSessions, source)
 	releasePlayerPumps(source)
 	releasePortableDeployment(source)
 	chaosCooldowns[source] = nil
-	fuelingSessions[source] = nil
-	chargingSessions[source] = nil
 	fuelCanSessions[source] = nil
 	portableChargingSessions[source] = nil
-	portableRechargeSessions[source] = nil
 	clearPortablePurchaseSession(source)
 end)
 

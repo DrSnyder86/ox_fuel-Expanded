@@ -13,6 +13,8 @@
     const confirm = document.getElementById('checkout-confirm');
     const cancel = document.getElementById('checkout-cancel');
     const local = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const query = new URLSearchParams(window.location.search);
+    const resource = ['station', 'pump'].includes(query.get('surface')) ? query.get('resource') : null;
     const logoSources = {
         prop_gas_pump_1a: 'logos/ui/prop_gas_pump_1a.png',
         prop_gas_pump_1b: 'logos/ui/prop_gas_pump_1b.png',
@@ -124,6 +126,7 @@
 
         summary.textContent = details.join(' \u00b7 ');
         confirm.disabled = !primary || !selectedPayment || state.submitting;
+        confirm.classList.toggle('is-keyboard-active', document.activeElement === confirm);
 
         for (const button of panel.querySelectorAll('.checkout-option')) {
             const selectedId = button.dataset.group === 'primary' ? state.primaryId : state.paymentId;
@@ -139,6 +142,19 @@
         if (group === 'primary') state.primaryId = id;
         if (group === 'payment') state.paymentId = id;
         updateSelection();
+    }
+
+    function moveFocus(direction) {
+        if (!state || state.submitting) return;
+        const current = document.activeElement?.closest('button');
+        const rows = [
+            primaryOptions.querySelector('.is-selected'),
+            paymentOptions.querySelector('.is-selected'),
+            confirm.disabled ? null : confirm,
+        ].filter(Boolean);
+        const index = current === confirm ? rows.length - 1 : current?.dataset.group === 'payment' ? 1 : 0;
+        rows[Math.max(0, Math.min(rows.length - 1, index + direction))]?.focus();
+        confirm.classList.toggle('is-keyboard-active', document.activeElement === confirm);
     }
 
     function applyPresentation(data) {
@@ -191,12 +207,14 @@
         state = null;
         panel.hidden = true;
         meter.classList.remove('is-checkout');
+        confirm.classList.remove('is-keyboard-active');
     }
 
     async function post(eventName, payload = {}) {
-        if (local || typeof GetParentResourceName !== 'function') return { ok: true };
+        const parent = resource || (typeof GetParentResourceName === 'function' && GetParentResourceName());
+        if (local || !parent) return { ok: true };
 
-        const response = await fetch(`https://${GetParentResourceName()}/${eventName}`, {
+        const response = await fetch(`https://${parent}/${eventName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json; charset=UTF-8' },
             body: JSON.stringify(payload),
@@ -246,6 +264,12 @@
             return;
         }
 
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            moveFocus(event.key === 'ArrowDown' ? 1 : -1);
+            return;
+        }
+
         if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
 
         const current = event.target.closest('.checkout-option');
@@ -263,6 +287,24 @@
 
     window.addEventListener('message', (event) => {
         const data = event.data || {};
+
+        if (data.action === 'worldInput' && state && resource) {
+            const current = document.activeElement?.closest('.checkout-option');
+            const group = current?.dataset.group;
+            if (data.control === 'confirm') submit();
+            else if (data.control === 'cancel') dismiss();
+            else if (data.control === 'up' || data.control === 'down') {
+                moveFocus(data.control === 'down' ? 1 : -1);
+            } else if (group && (data.control === 'left' || data.control === 'right')) {
+                const buttons = [...panel.querySelectorAll(`.checkout-option[data-group="${group}"]`)];
+                const direction = data.control === 'right' ? 1 : -1;
+                const index = current ? buttons.indexOf(current) : 0;
+                const next = buttons[(index + direction + buttons.length) % buttons.length];
+                next?.focus();
+                next?.click();
+            }
+            return;
+        }
 
         if (data.action === 'options') {
             show(data);
@@ -304,8 +346,8 @@
                 { id: 'cash', label: 'Cash', meta: '$1,250 available' },
                 { id: 'bank', label: 'Bank', meta: '$18,420 available' },
             ],
-            theme: electric ? 'modern' : 'vintage',
-            variant: electric ? 'charge-modern' : 'globe-vintage',
+            theme: electric || query.get('surface') === 'pump' ? 'modern' : 'vintage',
+            variant: electric ? 'charge-modern' : query.get('surface') === 'pump' ? 'ron-modern' : 'globe-vintage',
             logo: electric ? 'electric_charger' : 'prop_vintage_pump',
             accent: electric ? '#19b9ff' : '#d9584f',
         });

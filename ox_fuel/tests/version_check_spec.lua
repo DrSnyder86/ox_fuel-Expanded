@@ -22,7 +22,7 @@ function GetCurrentResourceName()
 end
 
 function GetResourceMetadata(_, key)
-	return key == 'version' and '1.5.2-expanded.2' or nil
+	return key == 'version' and '1.5.2-expanded.3' or nil
 end
 
 function CreateThread(callback)
@@ -46,19 +46,19 @@ end
 
 remoteManifest = [[
 fx_version 'cerulean'
-version '1.5.2-expanded.3'
+version '1.5.2-expanded.4'
 ]]
 
 dofile('server/version.lua')
 
 assert(#messages == 2, 'new version did not print the update and download notices')
-assert(messages[1]:find('1.5.2%-expanded%.3'), 'update notice used the wrong manifest value')
+assert(messages[1]:find('1.5.2%-expanded%.4'), 'update notice used the wrong manifest value')
 assert(messages[2]:find(settings.downloadUrl, 1, true), 'download notice used the wrong URL')
 
 messages = {}
 remoteManifest = [[
 fx_version 'cerulean'
-version '1.5.2-expanded.2'
+version '1.5.2-expanded.3'
 ]]
 
 dofile('server/version.lua')
